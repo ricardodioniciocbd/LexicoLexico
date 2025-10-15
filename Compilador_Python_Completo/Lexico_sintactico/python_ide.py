@@ -1,87 +1,48 @@
 """
-IDE Completo del Compilador de Python
-Con fondo azul gradiente y todas las fases de compilación
+IDE Interactivo para Compilador de Python
+Interfaz gráfica completa con todas las fases de compilación
 """
 
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, filedialog, font as tkfont
+from tkinter import ttk, scrolledtext, messagebox, filedialog
 from python_compiler import *
-from semantic_analyzer import SemanticAnalyzer
 from tac_generator import TACGenerator
 from tac_optimizer import TACOptimizer
 from tac_interpreter import TACInterpreter
-from machine_code_generator import MachineCodeGenerator
-from reglas_semanticas import REGLAS_SEMANTICAS, obtener_reglas_por_fase, obtener_nombre_fase
 
 
-# Colores Dark Mode profesional
+# Colores del tema oscuro
 COLORS = {
-    'bg_gradient_start': '#1e1e1e',  # Negro suave
-    'bg_gradient_end': '#2d2d30',    # Gris muy oscuro
-    'bg_dark': '#1e1e1e',            # Negro suave
-    'bg_medium': '#252526',          # Gris oscuro
-    'bg_light': '#2d2d30',           # Gris medio-oscuro
-    'bg_editor': '#1e1e1e',          # Negro para editor
-    'fg_primary': '#d4d4d4',         # Gris claro
-    'fg_secondary': '#858585',       # Gris medio
-    'accent_cyan': '#4ec9b0',        # Verde-cyan suave
-    'accent_green': '#4ec9b0',       # Verde-cyan
-    'accent_yellow': '#dcdcaa',      # Amarillo suave
-    'accent_red': '#f48771',         # Rojo suave
-    'accent_purple': '#c586c0',      # Púrpura suave
-    'border': '#3e3e42',             # Gris oscuro
-    'selection': '#264f78',          # Azul oscuro selección
-    'line_number': '#858585',        # Gris para números
-    'button_hover': '#3e3e42',       # Gris para hover
+    'bg_dark': '#1e1e1e',
+    'bg_medium': '#252526',
+    'bg_light': '#2d2d30',
+    'fg_primary': '#d4d4d4',
+    'fg_secondary': '#858585',
+    'accent_blue': '#007acc',
+    'accent_green': '#4ec9b0',
+    'accent_yellow': '#dcdcaa',
+    'accent_red': '#f48771',
+    'accent_purple': '#c586c0',
+    'border': '#3e3e42',
+    'selection': '#264f78',
+    'line_number': '#858585',
 }
 
 
-class GradientFrame(tk.Canvas):
-    """Frame con gradiente azul"""
-    def __init__(self, parent, color1, color2, **kwargs):
-        tk.Canvas.__init__(self, parent, **kwargs)
-        self.color1 = color1
-        self.color2 = color2
-        self.bind("<Configure>", self._draw_gradient)
-    
-    def _draw_gradient(self, event=None):
-        """Dibuja el gradiente"""
-        self.delete("gradient")
-        width = self.winfo_width()
-        height = self.winfo_height()
-        limit = height
-        
-        # Convertir colores hex a RGB
-        r1, g1, b1 = int(self.color1[1:3], 16), int(self.color1[3:5], 16), int(self.color1[5:7], 16)
-        r2, g2, b2 = int(self.color2[1:3], 16), int(self.color2[3:5], 16), int(self.color2[5:7], 16)
-        
-        for i in range(limit):
-            r = int(r1 + (r2 - r1) * i / limit)
-            g = int(g1 + (g2 - g1) * i / limit)
-            b = int(b1 + (b2 - b1) * i / limit)
-            color = f'#{r:02x}{g:02x}{b:02x}'
-            self.create_line(0, i, width, i, tags=("gradient",), fill=color)
-
-
 class PythonCompilerIDE:
-    """IDE Completo del Compilador"""
+    """IDE para el compilador de Python"""
     
     def __init__(self, root):
         self.root = root
-        self.root.title("Compilador Interactivo de Python - IDE Profesional")
-        self.root.geometry("1700x950")
-        
-        # Configurar estilo
-        self.style = ttk.Style()
-        self.style.theme_use('clam')
+        self.root.title("Compilador Interactivo de Python - IDE Completo")
+        self.root.geometry("1600x900")
+        self.root.configure(bg=COLORS['bg_dark'])
         
         # Datos de compilación
         self.tokens = []
         self.ast = None
-        self.semantic_analyzer = None
         self.tac_instructions = []
         self.optimized_tac = []
-        self.machine_code = []
         self.execution_output = ""
         
         self.setup_ui()
@@ -89,22 +50,8 @@ class PythonCompilerIDE:
     
     def setup_ui(self):
         """Configura la interfaz de usuario"""
-        # Frame principal con gradiente
-        self.main_gradient = GradientFrame(
-            self.root,
-            COLORS['bg_gradient_start'],
-            COLORS['bg_gradient_end'],
-            highlightthickness=0
-        )
-        self.main_gradient.pack(fill=tk.BOTH, expand=True)
-        
-        # Contenedor principal
-        main_container = tk.Frame(self.main_gradient, bg=COLORS['bg_dark'])
-        self.main_gradient.create_window(0, 0, anchor='nw', window=main_container)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
-        
-        # Barra de título personalizada
-        self.create_custom_title(main_container)
+        main_container = tk.Frame(self.root, bg=COLORS['bg_dark'])
+        main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Barra de herramientas
         self.create_toolbar(main_container)
@@ -114,96 +61,60 @@ class PythonCompilerIDE:
             main_container,
             orient=tk.HORIZONTAL,
             bg=COLORS['bg_dark'],
-            sashwidth=6,
-            sashrelief=tk.RAISED,
-            bd=0
+            sashwidth=5,
+            sashrelief=tk.RAISED
         )
         content_paned.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
         
         # Panel izquierdo - Editor
         left_panel = self.create_editor_panel(content_paned)
-        content_paned.add(left_panel, width=750)
+        content_paned.add(left_panel, width=700)
         
         # Panel derecho - Pestañas de salida
         right_panel = self.create_output_panel(content_paned)
-        content_paned.add(right_panel, width=900)
+        content_paned.add(right_panel, width=850)
         
         # Barra de estado
         self.create_status_bar(main_container)
     
-    def create_custom_title(self, parent):
-        """Crea barra de título personalizada"""
-        title_frame = tk.Frame(parent, bg=COLORS['bg_medium'], height=70)
-        title_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Título principal
-        title_font = tkfont.Font(family='Segoe UI', size=20, weight='bold')
-        title_label = tk.Label(
-            title_frame,
-            text="🐍 Compilador Interactivo de Python",
-            bg=COLORS['bg_medium'],
-            fg=COLORS['fg_primary'],
-            font=title_font,
-            pady=10
-        )
-        title_label.pack(side=tk.LEFT, padx=20)
-        
-        # Subtítulo
-        subtitle_font = tkfont.Font(family='Segoe UI', size=10)
-        subtitle_label = tk.Label(
-            title_frame,
-            text="Análisis Completo: Léxico • Sintáctico • Semántico • TAC • Optimización • Código Máquina",
-            bg=COLORS['bg_medium'],
-            fg=COLORS['fg_secondary'],
-            font=subtitle_font
-        )
-        subtitle_label.pack(side=tk.LEFT, padx=10)
-    
     def create_toolbar(self, parent):
         """Crea la barra de herramientas"""
-        toolbar = tk.Frame(parent, bg=COLORS['bg_light'], height=70)
-        toolbar.pack(fill=tk.X, pady=(0, 10))
+        toolbar = tk.Frame(parent, bg=COLORS['bg_medium'], height=60)
+        toolbar.pack(fill=tk.X, pady=(0, 5))
         
-        button_font = tkfont.Font(family='Segoe UI', size=11, weight='bold')
+        button_style = {
+            'bg': COLORS['accent_blue'],
+            'fg': 'white',
+            'font': ('Segoe UI', 10, 'bold'),
+            'relief': tk.FLAT,
+            'padx': 20,
+            'pady': 10,
+            'cursor': 'hand2'
+        }
         
-        # Botón Analizar (principal)
+        # Botón Analizar
         btn_analyze = tk.Button(
             toolbar,
-            text="▶ ANALIZAR",
+            text="▶ Analizar",
             command=self.analyze_code,
-            bg=COLORS['accent_cyan'],
-            fg='#000000',
-            font=button_font,
-            relief=tk.FLAT,
-            padx=30,
-            pady=12,
-            cursor='hand2',
-            activebackground=COLORS['accent_green'],
-            borderwidth=0
+            **button_style
         )
-        btn_analyze.pack(side=tk.LEFT, padx=10, pady=10)
+        btn_analyze.pack(side=tk.LEFT, padx=5, pady=10)
         
-        # Separador
-        sep = tk.Frame(toolbar, bg=COLORS['border'], width=2)
-        sep.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
-        
-        # Label de ejemplos
-        examples_label = tk.Label(
+        # Selector de ejemplos
+        tk.Label(
             toolbar,
             text="Ejemplos:",
-            bg=COLORS['bg_light'],
+            bg=COLORS['bg_medium'],
             fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Segoe UI', size=10, weight='bold')
-        )
-        examples_label.pack(side=tk.LEFT, padx=10)
+            font=('Segoe UI', 10)
+        ).pack(side=tk.LEFT, padx=(20, 5), pady=10)
         
-        # Radio buttons para ejemplos
         self.example_var = tk.StringVar(value="fibonacci")
         examples = [
             ("Fibonacci", "fibonacci"),
-            ("Búsqueda", "busqueda"),
-            ("Listas", "listas"),
-            ("Con Errores", "errores")
+            ("Búsqueda en Arreglo", "busqueda"),
+            ("Procesamiento de Listas", "listas")
         ]
         
         for label, value in examples:
@@ -212,13 +123,11 @@ class PythonCompilerIDE:
                 text=label,
                 variable=self.example_var,
                 value=value,
-                bg=COLORS['bg_light'],
+                bg=COLORS['bg_medium'],
                 fg=COLORS['fg_primary'],
                 selectcolor=COLORS['bg_dark'],
-                font=tkfont.Font(family='Segoe UI', size=9),
-                command=self.load_selected_example,
-                activebackground=COLORS['button_hover'],
-                cursor='hand2'
+                font=('Segoe UI', 9),
+                command=self.load_selected_example
             ).pack(side=tk.LEFT, padx=5)
         
         # Botón Limpiar
@@ -226,65 +135,70 @@ class PythonCompilerIDE:
             toolbar,
             text="🗑 Limpiar",
             command=self.clear_output,
-            bg=COLORS['bg_medium'],
+            bg=COLORS['bg_light'],
             fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Segoe UI', size=10),
+            font=('Segoe UI', 10),
             relief=tk.FLAT,
-            padx=20,
+            padx=15,
             pady=10,
             cursor='hand2'
         )
-        btn_clear.pack(side=tk.RIGHT, padx=10, pady=10)
+        btn_clear.pack(side=tk.LEFT, padx=5, pady=10)
+        
+        # Título
+        title_label = tk.Label(
+            toolbar,
+            text="Compilador Python - IDE Completo",
+            bg=COLORS['bg_medium'],
+            fg=COLORS['accent_green'],
+            font=('Segoe UI', 13, 'bold')
+        )
+        title_label.pack(side=tk.RIGHT, padx=10, pady=10)
     
     def create_editor_panel(self, parent):
         """Crea el panel del editor de código"""
         editor_frame = tk.Frame(parent, bg=COLORS['bg_medium'])
         
         # Etiqueta del editor
-        label_frame = tk.Frame(editor_frame, bg=COLORS['bg_light'])
-        label_frame.pack(fill=tk.X, padx=0, pady=0)
-        
         label = tk.Label(
-            label_frame,
-            text=" 📝 Editor de Código Python",
-            bg=COLORS['bg_light'],
-            fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Segoe UI', size=12, weight='bold'),
-            anchor='w',
-            pady=8
+            editor_frame,
+            text="Editor de Código Python",
+            bg=COLORS['bg_medium'],
+            fg=COLORS['accent_yellow'],
+            font=('Segoe UI', 12, 'bold'),
+            anchor='w'
         )
-        label.pack(fill=tk.X, padx=15)
+        label.pack(fill=tk.X, padx=10, pady=(10, 5))
         
         # Frame para números de línea y editor
         editor_container = tk.Frame(editor_frame, bg=COLORS['bg_dark'])
-        editor_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        editor_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         
         # Números de línea
         self.line_numbers = tk.Text(
             editor_container,
-            width=5,
+            width=4,
             bg=COLORS['bg_light'],
             fg=COLORS['line_number'],
-            font=tkfont.Font(family='Consolas', size=11),
+            font=('Consolas', 11),
             state='disabled',
             relief=tk.FLAT,
-            padx=8
+            padx=5
         )
         self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
         
         # Editor de código
         self.code_editor = scrolledtext.ScrolledText(
             editor_container,
-            bg=COLORS['bg_editor'],
+            bg=COLORS['bg_dark'],
             fg=COLORS['fg_primary'],
             insertbackground='white',
-            font=tkfont.Font(family='Consolas', size=11),
+            font=('Consolas', 11),
             relief=tk.FLAT,
-            padx=15,
-            pady=15,
+            padx=10,
+            pady=10,
             wrap=tk.NONE,
-            undo=True,
-            selectbackground=COLORS['selection']
+            undo=True
         )
         self.code_editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.code_editor.bind('<KeyRelease>', self.update_line_numbers)
@@ -296,22 +210,24 @@ class PythonCompilerIDE:
         output_frame = tk.Frame(parent, bg=COLORS['bg_medium'])
         
         # Configurar estilo del notebook
-        self.style.configure(
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure(
             'Custom.TNotebook',
             background=COLORS['bg_medium'],
             borderwidth=0
         )
-        self.style.configure(
+        style.configure(
             'Custom.TNotebook.Tab',
             background=COLORS['bg_light'],
             foreground=COLORS['fg_primary'],
-            padding=[18, 10],
-            font=('Segoe UI', 10, 'bold')
+            padding=[20, 10],
+            font=('Segoe UI', 10)
         )
-        self.style.map(
+        style.map(
             'Custom.TNotebook.Tab',
-            background=[('selected', COLORS['accent_green'])],
-            foreground=[('selected', '#000000')]
+            background=[('selected', COLORS['accent_blue'])],
+            foreground=[('selected', 'white')]
         )
         
         self.notebook = ttk.Notebook(output_frame, style='Custom.TNotebook')
@@ -320,202 +236,151 @@ class PythonCompilerIDE:
         # Crear pestañas
         self.create_lexical_tab()
         self.create_syntax_tab()
-        self.create_semantic_tab()  # Nueva pestaña
         self.create_intermediate_code_tab()
         self.create_optimization_tab()
-        self.create_machine_code_tab()  # Nueva pestaña
         self.create_execution_tab()
-        self.create_semantic_rules_tab()  # Nueva pestaña
-        self.create_grammar_tab()
+        self.create_rules_tab()
         
         return output_frame
     
     def create_lexical_tab(self):
         """Crea la pestaña de Análisis Léxico"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="📋 Análisis Léxico")
+        tab = tk.Frame(self.notebook, bg=COLORS['bg_dark'])
+        self.notebook.add(tab, text="Análisis Léxico")
         
         self.lexical_text = scrolledtext.ScrolledText(
             tab,
-            bg=COLORS['bg_editor'],
+            bg=COLORS['bg_dark'],
             fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Consolas', size=10),
+            font=('Consolas', 10),
             relief=tk.FLAT,
-            padx=15,
-            pady=15
+            padx=10,
+            pady=10
         )
         self.lexical_text.pack(fill=tk.BOTH, expand=True)
     
     def create_syntax_tab(self):
         """Crea la pestaña de Análisis Sintáctico"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="🌳 Análisis Sintáctico")
+        tab = tk.Frame(self.notebook, bg=COLORS['bg_dark'])
+        self.notebook.add(tab, text="Análisis Sintáctico")
         
         self.syntax_text = scrolledtext.ScrolledText(
             tab,
-            bg=COLORS['bg_editor'],
+            bg=COLORS['bg_dark'],
             fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Consolas', size=10),
+            font=('Consolas', 10),
             relief=tk.FLAT,
-            padx=15,
-            pady=15
+            padx=10,
+            pady=10
         )
         self.syntax_text.pack(fill=tk.BOTH, expand=True)
     
-    def create_semantic_tab(self):
-        """Crea la pestaña de Análisis Semántico"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="🔍 Análisis Semántico")
-        
-        self.semantic_text = scrolledtext.ScrolledText(
-            tab,
-            bg=COLORS['bg_editor'],
-            fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Consolas', size=10),
-            relief=tk.FLAT,
-            padx=15,
-            pady=15
-        )
-        self.semantic_text.pack(fill=tk.BOTH, expand=True)
-    
     def create_intermediate_code_tab(self):
         """Crea la pestaña de Código Intermedio"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="⚙️ Código TAC")
+        tab = tk.Frame(self.notebook, bg=COLORS['bg_dark'])
+        self.notebook.add(tab, text="Código Intermedio (TAC)")
         
         self.intermediate_text = scrolledtext.ScrolledText(
             tab,
-            bg=COLORS['bg_editor'],
+            bg=COLORS['bg_dark'],
             fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Consolas', size=10),
+            font=('Consolas', 10),
             relief=tk.FLAT,
-            padx=15,
-            pady=15
+            padx=10,
+            pady=10
         )
         self.intermediate_text.pack(fill=tk.BOTH, expand=True)
     
     def create_optimization_tab(self):
         """Crea la pestaña de Optimización"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="🚀 Optimización")
+        tab = tk.Frame(self.notebook, bg=COLORS['bg_dark'])
+        self.notebook.add(tab, text="Optimización de Código")
         
         self.optimization_text = scrolledtext.ScrolledText(
             tab,
-            bg=COLORS['bg_editor'],
+            bg=COLORS['bg_dark'],
             fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Consolas', size=10),
+            font=('Consolas', 10),
             relief=tk.FLAT,
-            padx=15,
-            pady=15
+            padx=10,
+            pady=10
         )
         self.optimization_text.pack(fill=tk.BOTH, expand=True)
     
-    def create_machine_code_tab(self):
-        """Crea la pestaña de Código Máquina"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="💻 Código Máquina")
-        
-        self.machine_code_text = scrolledtext.ScrolledText(
-            tab,
-            bg=COLORS['bg_editor'],
-            fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Consolas', size=10),
-            relief=tk.FLAT,
-            padx=15,
-            pady=15
-        )
-        self.machine_code_text.pack(fill=tk.BOTH, expand=True)
-    
     def create_execution_tab(self):
         """Crea la pestaña de Ejecución"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="▶️ Ejecución")
+        tab = tk.Frame(self.notebook, bg=COLORS['bg_dark'])
+        self.notebook.add(tab, text="Salida de Ejecución")
         
         self.execution_text = scrolledtext.ScrolledText(
             tab,
-            bg=COLORS['bg_editor'],
-            fg=COLORS['accent_green'],
-            font=tkfont.Font(family='Consolas', size=12, weight='bold'),
+            bg=COLORS['bg_dark'],
+            fg=COLORS['fg_primary'],
+            font=('Consolas', 11),
             relief=tk.FLAT,
-            padx=15,
-            pady=15
+            padx=10,
+            pady=10
         )
         self.execution_text.pack(fill=tk.BOTH, expand=True)
     
-    def create_semantic_rules_tab(self):
-        """Crea la pestaña de Reglas Semánticas"""
-        tab = tk.Frame(self.notebook, bg='#0a1929')
-        self.notebook.add(tab, text="📚 Reglas Semánticas")
+    def create_rules_tab(self):
+        """Crea la pestaña de Reglas"""
+        tab = tk.Frame(self.notebook, bg=COLORS['bg_dark'])
+        self.notebook.add(tab, text="Reglas y Gramática")
         
-        # Crear notebook interno para las fases
+        # Crear notebook interno para reglas
         rules_notebook = ttk.Notebook(tab, style='Custom.TNotebook')
         rules_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Crear pestaña para cada fase
-        for fase_id in ['lexico', 'sintactico', 'semantico', 'codigo']:
-            fase_tab = tk.Frame(rules_notebook, bg=COLORS['bg_editor'])
-            rules_notebook.add(fase_tab, text=obtener_nombre_fase(fase_id))
-            
-            rules_text = scrolledtext.ScrolledText(
-                fase_tab,
-                bg=COLORS['bg_editor'],
-                fg=COLORS['fg_primary'],
-                font=tkfont.Font(family='Consolas', size=9),
-                relief=tk.FLAT,
-                padx=15,
-                pady=15,
-                wrap=tk.WORD
-            )
-            rules_text.pack(fill=tk.BOTH, expand=True)
-            
-            # Llenar con reglas de la fase
-            reglas = obtener_reglas_por_fase(fase_id)
-            content = f"REGLAS SEMÁNTICAS - {obtener_nombre_fase(fase_id).upper()}\n"
-            content += "=" * 100 + "\n\n"
-            
-            for i, regla in enumerate(reglas, 1):
-                content += f"{i}. ID: {regla.id_regla}\n"
-                content += f"   Regla Gramatical: {regla.regla_gramatical}\n"
-                content += f"   Producción: {regla.produccion}\n"
-                content += f"   Acción Semántica: {regla.accion_semantica}\n"
-                content += f"   Ejemplo:\n   {regla.ejemplo}\n"
-                content += "-" * 100 + "\n\n"
-            
-            rules_text.insert('1.0', content)
-            rules_text.config(state='disabled')
-    
-    def create_grammar_tab(self):
-        """Crea la pestaña de Gramática"""
-        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
-        self.notebook.add(tab, text="📖 Gramática")
+        # Pestaña de Gramática
+        grammar_tab = tk.Frame(rules_notebook, bg=COLORS['bg_dark'])
+        rules_notebook.add(grammar_tab, text="Gramática")
         
         grammar_text = scrolledtext.ScrolledText(
-            tab,
-            bg=COLORS['bg_editor'],
+            grammar_tab,
+            bg=COLORS['bg_dark'],
             fg=COLORS['fg_primary'],
-            font=tkfont.Font(family='Consolas', size=10),
+            font=('Consolas', 10),
             relief=tk.FLAT,
-            padx=15,
-            pady=15,
+            padx=10,
+            pady=10,
             wrap=tk.WORD
         )
         grammar_text.pack(fill=tk.BOTH, expand=True)
-        grammar_text.insert('1.0', self.get_grammar_content())
+        grammar_text.insert('1.0', self.get_grammar_rules())
         grammar_text.config(state='disabled')
+        
+        # Pestaña de Optimizaciones
+        opt_rules_tab = tk.Frame(rules_notebook, bg=COLORS['bg_dark'])
+        rules_notebook.add(opt_rules_tab, text="Reglas de Optimización")
+        
+        opt_rules_text = scrolledtext.ScrolledText(
+            opt_rules_tab,
+            bg=COLORS['bg_dark'],
+            fg=COLORS['fg_primary'],
+            font=('Consolas', 10),
+            relief=tk.FLAT,
+            padx=10,
+            pady=10,
+            wrap=tk.WORD
+        )
+        opt_rules_text.pack(fill=tk.BOTH, expand=True)
+        opt_rules_text.insert('1.0', self.get_optimization_rules())
+        opt_rules_text.config(state='disabled')
     
     def create_status_bar(self, parent):
         """Crea la barra de estado"""
         self.status_bar = tk.Label(
             parent,
-            text="Listo para analizar código",
-            bg=COLORS['accent_green'],
-            fg='#000000',
-            font=tkfont.Font(family='Segoe UI', size=10, weight='bold'),
+            text="Listo",
+            bg=COLORS['accent_blue'],
+            fg='white',
+            font=('Segoe UI', 9),
             anchor='w',
-            padx=15,
-            pady=8
+            padx=10,
+            pady=5
         )
-        self.status_bar.pack(fill=tk.X, side=tk.BOTTOM, pady=(10, 0))
+        self.status_bar.pack(fill=tk.X, side=tk.BOTTOM)
     
     def update_line_numbers(self, event=None):
         """Actualiza los números de línea"""
@@ -535,7 +400,7 @@ class PythonCompilerIDE:
             messagebox.showwarning("Advertencia", "El editor está vacío")
             return
         
-        self.status_bar.config(text="Analizando código...", bg=COLORS['accent_yellow'], fg='#000000')
+        self.status_bar.config(text="Analizando...", bg=COLORS['accent_yellow'], fg='black')
         self.root.update()
         
         try:
@@ -549,88 +414,62 @@ class PythonCompilerIDE:
             self.ast = parser.parse()
             self.display_syntax_analysis()
             
-            # Fase 3: Análisis Semántico
-            self.semantic_analyzer = SemanticAnalyzer()
-            self.semantic_analyzer.analyze(self.ast)
-            self.display_semantic_analysis()
-            
-            # Verificar si hay errores semánticos
-            if self.semantic_analyzer.errors:
-                self.status_bar.config(
-                    text=f"⚠️ Compilación completada con {len(self.semantic_analyzer.errors)} errores semánticos",
-                    bg=COLORS['accent_red']
-                )
-                return
-            
-            # Fase 4: Generación de Código Intermedio
+            # Fase 3: Generación de Código Intermedio
             tac_gen = TACGenerator()
             self.tac_instructions = tac_gen.generate(self.ast)
             self.display_intermediate_code()
             
-            # Fase 5: Optimización
+            # Fase 4: Optimización
             optimizer = TACOptimizer()
             self.optimized_tac = optimizer.optimize(self.tac_instructions)
             self.display_optimization(optimizer)
             
-            # Fase 6: Generación de Código Máquina
-            machine_gen = MachineCodeGenerator()
-            self.machine_code = machine_gen.generate(self.optimized_tac)
-            self.display_machine_code()
-            
-            # Fase 7: Ejecución
+            # Fase 5: Ejecución
             interpreter = TACInterpreter()
             self.execution_output = interpreter.interpret(self.optimized_tac)
             self.display_execution()
             
             self.status_bar.config(
-                text="✅ Análisis completado exitosamente",
+                text="✓ Análisis completado exitosamente",
                 bg=COLORS['accent_green'],
-                fg='#000000'
+                fg='white'
             )
             
-        except LexerError as e:
-            messagebox.showerror("Error Léxico", str(e))
-            self.status_bar.config(text=f"❌ Error léxico", bg=COLORS['accent_red'])
-        except ParserError as e:
-            messagebox.showerror("Error Sintáctico", str(e))
-            self.status_bar.config(text=f"❌ Error sintáctico", bg=COLORS['accent_red'])
         except Exception as e:
-            messagebox.showerror("Error", f"Error inesperado: {str(e)}")
-            self.status_bar.config(text=f"❌ Error", bg=COLORS['accent_red'])
-    
-    # Los métodos de display se continuarán en la siguiente parte...
+            messagebox.showerror("Error", f"Error durante el análisis:\n{str(e)}")
+            self.status_bar.config(text="Error en el análisis", bg=COLORS['accent_red'])
     
     def display_lexical_analysis(self):
         """Muestra el análisis léxico"""
         self.lexical_text.delete('1.0', 'end')
         
         output = "ANÁLISIS LÉXICO\n"
-        output += "=" * 120 + "\n\n"
-        output += f"{'Token':<25} {'Tipo':<30} {'Línea':<15} {'Posición':<15}\n"
-        output += "-" * 120 + "\n"
+        output += "=" * 100 + "\n\n"
+        output += f"{'Token':<20} {'Tipo':<25} {'Línea':<10} {'Posición':<10}\n"
+        output += "-" * 100 + "\n"
         
         for token in self.tokens:
             if token.type.name not in ('NEWLINE', 'EOF', 'INDENT', 'DEDENT'):
                 value = str(token.value) if token.value is not None else ''
-                output += f"{value:<25} {token.type.name:<30} {token.line:<15} {token.column:<15}\n"
+                output += f"{value:<20} {token.type.name:<25} {token.line:<10} {token.column:<10}\n"
         
-        output += "\n" + "=" * 120 + "\n"
+        output += "\n" + "=" * 100 + "\n"
         output += f"Total de tokens: {len([t for t in self.tokens if t.type.name not in ('NEWLINE', 'EOF', 'INDENT', 'DEDENT')])}\n"
         
         self.lexical_text.insert('1.0', output)
     
     def display_syntax_analysis(self):
-        """Muestra el análisis sintáctico"""
+        """Muestra el análisis sintáctico (AST)"""
         self.syntax_text.delete('1.0', 'end')
         
         output = "ÁRBOL DE SINTAXIS ABSTRACTA (AST)\n"
-        output += "=" * 120 + "\n\n"
+        output += "=" * 100 + "\n\n"
         output += self.format_ast(self.ast, 0)
         
         self.syntax_text.insert('1.0', output)
     
     def format_ast(self, node, indent):
-        """Formatea el AST"""
+        """Formatea el AST para visualización"""
         indent_str = "  " * indent
         result = f"{indent_str}├─ {node.__class__.__name__}\n"
         
@@ -677,29 +516,28 @@ class PythonCompilerIDE:
             result += f"{indent_str}│  └─ Nombre: {node.name}\n"
         elif isinstance(node, ListNode):
             result += f"{indent_str}│  └─ Elementos: {len(node.elements)}\n"
+            for elem in node.elements:
+                result += self.format_ast(elem, indent + 2)
+        elif isinstance(node, CallNode):
+            result += f"{indent_str}│  ├─ Función: {node.function}\n"
+            result += f"{indent_str}│  └─ Argumentos: {len(node.args)}\n"
         elif isinstance(node, BlockNode):
             for stmt in node.statements:
                 result += self.format_ast(stmt, indent + 1)
         
         return result
     
-    def display_semantic_analysis(self):
-        """Muestra el análisis semántico"""
-        self.semantic_text.delete('1.0', 'end')
-        output = self.semantic_analyzer.get_report()
-        self.semantic_text.insert('1.0', output)
-    
     def display_intermediate_code(self):
-        """Muestra el código intermedio"""
+        """Muestra el código intermedio (TAC)"""
         self.intermediate_text.delete('1.0', 'end')
         
         output = "CÓDIGO INTERMEDIO DE TRES DIRECCIONES (TAC)\n"
-        output += "=" * 120 + "\n\n"
+        output += "=" * 100 + "\n\n"
         
         for i, instr in enumerate(self.tac_instructions):
-            output += f"{i:4d}: {str(instr)}\n"
+            output += f"{i:3d}: {str(instr)}\n"
         
-        output += "\n" + "=" * 120 + "\n"
+        output += "\n" + "=" * 100 + "\n"
         output += f"Total de instrucciones: {len(self.tac_instructions)}\n"
         
         self.intermediate_text.insert('1.0', output)
@@ -709,12 +547,12 @@ class PythonCompilerIDE:
         self.optimization_text.delete('1.0', 'end')
         
         output = "CÓDIGO TAC OPTIMIZADO\n"
-        output += "=" * 120 + "\n\n"
+        output += "=" * 100 + "\n\n"
         
         for i, instr in enumerate(self.optimized_tac):
-            output += f"{i:4d}: {str(instr)}\n"
+            output += f"{i:3d}: {str(instr)}\n"
         
-        output += "\n" + "=" * 120 + "\n"
+        output += "\n" + "=" * 100 + "\n"
         output += f"Instrucciones originales: {len(self.tac_instructions)}\n"
         output += f"Instrucciones optimizadas: {len(self.optimized_tac)}\n"
         output += f"Reducción: {len(self.tac_instructions) - len(self.optimized_tac)} instrucciones\n\n"
@@ -723,24 +561,14 @@ class PythonCompilerIDE:
         
         self.optimization_text.insert('1.0', output)
     
-    def display_machine_code(self):
-        """Muestra el código máquina"""
-        self.machine_code_text.delete('1.0', 'end')
-        
-        output = "CÓDIGO ENSAMBLADOR GENERADO\n"
-        output += "=" * 120 + "\n\n"
-        output += '\n'.join(self.machine_code)
-        
-        self.machine_code_text.insert('1.0', output)
-    
     def display_execution(self):
         """Muestra la salida de ejecución"""
         self.execution_text.delete('1.0', 'end')
         
         output = "SALIDA DE LA EJECUCIÓN\n"
-        output += "=" * 120 + "\n\n"
+        output += "=" * 100 + "\n\n"
         output += self.execution_output
-        output += "\n\n" + "=" * 120 + "\n"
+        output += "\n\n" + "=" * 100 + "\n"
         
         self.execution_text.insert('1.0', output)
     
@@ -748,12 +576,10 @@ class PythonCompilerIDE:
         """Limpia todas las salidas"""
         self.lexical_text.delete('1.0', 'end')
         self.syntax_text.delete('1.0', 'end')
-        self.semantic_text.delete('1.0', 'end')
         self.intermediate_text.delete('1.0', 'end')
         self.optimization_text.delete('1.0', 'end')
-        self.machine_code_text.delete('1.0', 'end')
         self.execution_text.delete('1.0', 'end')
-        self.status_bar.config(text="Salidas limpiadas", bg=COLORS['accent_green'], fg='#000000')
+        self.status_bar.config(text="Salidas limpiadas", bg=COLORS['accent_blue'], fg='white')
     
     def load_selected_example(self):
         """Carga el ejemplo seleccionado"""
@@ -764,8 +590,6 @@ class PythonCompilerIDE:
             self.load_search_example()
         elif example == "listas":
             self.load_list_processing_example()
-        elif example == "errores":
-            self.load_error_example()
     
     def load_fibonacci_example(self):
         """Carga el ejemplo de Fibonacci"""
@@ -789,15 +613,19 @@ while i < n:
         self.code_editor.delete('1.0', 'end')
         self.code_editor.insert('1.0', code)
         self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo de Fibonacci cargado", bg=COLORS['accent_green'], fg='#000000')
+        self.status_bar.config(text="Ejemplo de Fibonacci cargado", bg=COLORS['accent_blue'], fg='white')
     
     def load_search_example(self):
-        """Carga el ejemplo de búsqueda"""
+        """Carga el ejemplo de búsqueda en arreglo"""
         code = '''# Búsqueda en Arreglo
 numeros = [10, 25, 30, 45, 50, 60, 75]
 buscando = 45
 encontrado = 0
 posicion = 0
+
+print("Arreglo:")
+for num in numeros:
+    print(num)
 
 print("Buscando:")
 print(buscando)
@@ -818,16 +646,18 @@ else:
         self.code_editor.delete('1.0', 'end')
         self.code_editor.insert('1.0', code)
         self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo de búsqueda cargado", bg=COLORS['accent_green'], fg='#000000')
+        self.status_bar.config(text="Ejemplo de búsqueda cargado", bg=COLORS['accent_blue'], fg='white')
     
     def load_list_processing_example(self):
         """Carga el ejemplo de procesamiento de listas"""
         code = '''# Procesamiento de Listas
+# Calcular suma y promedio de números
+
 numeros = [10, 20, 30, 40, 50]
 suma = 0
 contador = 0
 
-print("Números:")
+print("Números originales:")
 for num in numeros:
     print(num)
     suma = suma + num
@@ -840,46 +670,26 @@ print(suma)
 
 print("Promedio:")
 print(promedio)
+
+# Crear lista de números pares
+pares = []
+for num in numeros:
+    resto = num % 2
+    if resto == 0:
+        pares.append(num)
+
+print("Números pares:")
+for par in pares:
+    print(par)
 '''
         self.code_editor.delete('1.0', 'end')
         self.code_editor.insert('1.0', code)
         self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo de procesamiento cargado", bg=COLORS['accent_green'], fg='#000000')
+        self.status_bar.config(text="Ejemplo de procesamiento de listas cargado", bg=COLORS['accent_blue'], fg='white')
     
-    def load_error_example(self):
-        """Carga el ejemplo con errores"""
-        code = '''# Ejemplo con ERRORES para demostración
-
-# Error léxico: carácter inválido
-# resultado = 5 @@ 3
-
-# Error sintáctico: falta dos puntos
-# if x > 0
-#     print(x)
-
-# Error semántico: variable no declarada
-print(variable_no_declarada)
-
-# Error semántico: tipos incompatibles
-x = 5
-y = "texto"
-z = x + y  # No se puede sumar int con string
-
-# Error semántico: división por cero
-a = 10
-b = 0
-c = a / b
-
-print("Este código tiene errores")
-'''
-        self.code_editor.delete('1.0', 'end')
-        self.code_editor.insert('1.0', code)
-        self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo con ERRORES cargado", bg=COLORS['accent_red'], fg='#ffffff')
-    
-    def get_grammar_content(self):
-        """Retorna el contenido de la gramática"""
-        return r"""GRAMÁTICA DEL COMPILADOR PYTHON (Subconjunto)
+    def get_grammar_rules(self):
+        """Retorna las reglas gramaticales"""
+        return """GRAMÁTICA DEL COMPILADOR PYTHON (Subconjunto)
 ================================================================================
 
 PROGRAMA
@@ -970,6 +780,94 @@ Delimitadores: ( ) [ ] : , .
 Asignación: =
 
 Especiales: NEWLINE, INDENT, DEDENT, EOF
+"""
+    
+    def get_optimization_rules(self):
+        """Retorna las reglas de optimización"""
+        return """REGLAS DE OPTIMIZACIÓN DEL COMPILADOR
+================================================================================
+
+1. PLEGADO DE CONSTANTES (Constant Folding)
+--------------------------------------------
+Descripción: Evalúa operaciones con constantes en tiempo de compilación.
+
+Ejemplos:
+  - 2 + 3 → 5
+  - 10 * 5 → 50
+  - 100 / 4 → 25
+
+Beneficio: Reduce el tiempo de ejecución al precalcular valores constantes.
+
+
+2. PROPAGACIÓN DE CONSTANTES (Constant Propagation)
+----------------------------------------------------
+Descripción: Reemplaza variables con sus valores constantes conocidos.
+
+Ejemplos:
+  - x = 5; y = x + 3 → x = 5; y = 8
+  - a = 10; b = a * 2 → a = 10; b = 20
+
+Beneficio: Permite aplicar más optimizaciones y reduce accesos a memoria.
+
+
+3. ELIMINACIÓN DE CÓDIGO MUERTO (Dead Code Elimination)
+--------------------------------------------------------
+Descripción: Remueve instrucciones que no afectan el resultado del programa.
+
+Ejemplos:
+  - Variables temporales nunca usadas
+  - Asignaciones a variables que no se leen después
+
+Beneficio: Reduce el tamaño del código y mejora el rendimiento.
+
+
+4. REDUCCIÓN DE FUERZA (Strength Reduction)
+--------------------------------------------
+Descripción: Reemplaza operaciones costosas por otras más eficientes.
+
+Ejemplos:
+  - x * 2 → x << 1 (desplazamiento de bits)
+  - x / 4 → x >> 2 (desplazamiento de bits)
+  - x * 0 → 0
+  - x * 1 → x
+  - x + 0 → x
+
+Beneficio: Operaciones más rápidas en el procesador.
+
+
+5. ELIMINACIÓN DE ASIGNACIONES REDUNDANTES
+-------------------------------------------
+Descripción: Remueve asignaciones de una variable a sí misma.
+
+Ejemplos:
+  - x = x (eliminado)
+
+Beneficio: Reduce instrucciones innecesarias.
+
+
+6. ELIMINACIÓN DE SALTOS INNECESARIOS
+--------------------------------------
+Descripción: Remueve saltos a la siguiente instrucción.
+
+Ejemplos:
+  - goto L1; L1: → L1: (sin el goto)
+
+Beneficio: Mejora el flujo de control y reduce instrucciones.
+
+
+ESTADÍSTICAS DE OPTIMIZACIÓN
+=============================
+El compilador muestra:
+- Número de instrucciones antes y después
+- Reducción en número de instrucciones
+- Lista detallada de optimizaciones aplicadas
+
+IMPACTO EN RENDIMIENTO
+======================
+Las optimizaciones pueden:
+- Reducir el tamaño del código en 20-40%
+- Mejorar el tiempo de ejecución en 15-30%
+- Disminuir el uso de memoria temporal
 """
 
 

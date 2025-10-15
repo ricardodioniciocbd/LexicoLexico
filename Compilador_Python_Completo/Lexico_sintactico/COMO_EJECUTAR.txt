@@ -1,0 +1,92 @@
+================================================================================
+COMPILADOR INTERACTIVO DE PYTHON
+================================================================================
+
+CÓMO EJECUTAR EL IDE
+====================
+
+Opción 1: Ejecutar el IDE con interfaz gráfica
+-----------------------------------------------
+python python_ide.py
+
+Esto abrirá una ventana con:
+- Editor de código
+- Botón "Analizar"
+- Ejemplos precargados (Fibonacci, Búsqueda, Listas)
+- 6 pestañas de resultados
+
+
+Opción 2: Ejecutar prueba desde consola
+----------------------------------------
+python test_compiler.py
+
+Esto ejecutará una prueba completa y mostrará los resultados en consola.
+
+
+ESTRUCTURA DEL PROYECTO
+========================
+
+Archivos Principales:
+- python_ide.py          → Interfaz gráfica (EJECUTAR ESTE)
+- python_compiler.py     → Lexer y Parser
+- tac_generator.py       → Generador de código intermedio
+- tac_optimizer.py       → Optimizador de código
+- tac_interpreter.py     → Intérprete de TAC
+- test_compiler.py       → Script de prueba
+
+Documentación:
+- README_COMPILADOR.md   → Documentación completa
+- GUIA_RAPIDA.md         → Guía rápida de uso
+- RESUMEN_PROYECTO.md    → Resumen del proyecto
+- COMO_EJECUTAR.txt      → Este archivo
+
+
+PESTAÑAS DEL IDE
+================
+
+1. Análisis Léxico      → Tabla de tokens
+2. Análisis Sintáctico  → Árbol AST
+3. Código Intermedio    → TAC generado
+4. Optimización         → TAC optimizado + reporte
+5. Salida de Ejecución  → Resultado del programa
+6. Reglas y Gramática   → Documentación
+
+
+EJEMPLOS INCLUIDOS
+==================
+
+1. Fibonacci            → Serie de Fibonacci
+2. Búsqueda en Arreglo  → Búsqueda lineal
+3. Procesamiento Listas → Suma, promedio, filtrado
+
+
+CARACTERÍSTICAS
+===============
+
+✓ Análisis Léxico completo
+✓ Parser con construcción de AST
+✓ Generación de código TAC
+✓ 6 optimizaciones automáticas
+✓ Interpretación y ejecución
+✓ Ejemplos funcionales
+✓ Interfaz gráfica profesional
+
+
+REQUISITOS
+==========
+
+- Python 3.7 o superior
+- Tkinter (incluido con Python)
+
+
+SOPORTE
+=======
+
+Para más información consulta:
+- README_COMPILADOR.md
+- GUIA_RAPIDA.md
+
+================================================================================
+¡Disfruta del compilador!
+================================================================================
+
