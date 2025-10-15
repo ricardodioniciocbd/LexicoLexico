@@ -1,284 +1,374 @@
 """
-Semantic Analyzer Module
-Performs semantic analysis including type checking and symbol table management
+Analizador Semántico
+Verifica que las variables estén declaradas antes de usarse y que los tipos sean compatibles
 """
 
-from ast_nodes import *
+from python_compiler import *
 
 
 class SemanticError(Exception):
-    """Exception raised for semantic errors"""
+    """Error en el análisis semántico"""
     pass
 
 
-class SymbolTable:
-    """Symbol table for tracking variables and their types"""
-    
-    def __init__(self, parent=None):
-        self.symbols = {}
-        self.parent = parent
-    
-    def define(self, name, var_type, value=None):
-        """Define a new variable in current scope"""
-        self.symbols[name] = {
-            'type': var_type,
-            'value': value,
-            'initialized': value is not None
-        }
-    
-    def lookup(self, name):
-        """Look up a variable in current or parent scopes"""
-        if name in self.symbols:
-            return self.symbols[name]
-        elif self.parent:
-            return self.parent.lookup(name)
-        return None
-    
-    def update(self, name, var_type=None, value=None):
-        """Update an existing variable"""
-        if name in self.symbols:
-            if var_type:
-                self.symbols[name]['type'] = var_type
-            if value is not None:
-                self.symbols[name]['value'] = value
-                self.symbols[name]['initialized'] = True
-        elif self.parent:
-            self.parent.update(name, var_type, value)
-    
-    def exists(self, name):
-        """Check if variable exists in any scope"""
-        return self.lookup(name) is not None
-
-
 class SemanticAnalyzer:
-    """Performs semantic analysis on AST"""
+    """Analizador Semántico que verifica variables y tipos"""
     
     def __init__(self):
-        self.global_scope = SymbolTable()
-        self.current_scope = self.global_scope
+        self.symbol_table = {}  # {nombre_variable: {'type': tipo, 'initialized': bool, 'line': linea}}
         self.errors = []
         self.warnings = []
+        self.current_scope = 'global'
     
     def error(self, message, line=0):
-        """Record a semantic error"""
-        error_msg = f"Semantic Error at line {line}: {message}"
+        """Registra un error semántico"""
+        error_msg = f"Línea {line}: {message}" if line else message
         self.errors.append(error_msg)
     
     def warning(self, message, line=0):
-        """Record a semantic warning"""
-        warning_msg = f"Warning at line {line}: {message}"
-        self.warnings.append(warning_msg)
+        """Registra una advertencia"""
+        warn_msg = f"Línea {line}: {message}" if line else message
+        self.warnings.append(warn_msg)
     
-    def enter_scope(self):
-        """Enter a new scope (e.g., for blocks)"""
-        self.current_scope = SymbolTable(parent=self.current_scope)
+    def infer_type(self, node):
+        """Infiere el tipo de una expresión"""
+        if isinstance(node, NumberNode):
+            return 'float' if isinstance(node.value, float) else 'int'
+        elif isinstance(node, StringNode):
+            return 'str'
+        elif isinstance(node, IdentifierNode):
+            if node.name in self.symbol_table:
+                return self.symbol_table[node.name]['type']
+            else:
+                return 'unknown'
+        elif isinstance(node, BinaryOpNode):
+            left_type = self.infer_type(node.left)
+            right_type = self.infer_type(node.right)
+            
+            # Operaciones de comparación siempre devuelven bool
+            if node.operator in ['==', '!=', '<', '>', '<=', '>=']:
+                return 'bool'
+            
+            # Operaciones aritméticas
+            if node.operator in ['+', '-', '*', '/', '%']:
+                # Si alguno es float, el resultado es float
+                if left_type == 'float' or right_type == 'float':
+                    return 'float'
+                # Si ambos son int, el resultado es int (excepto división)
+                if left_type == 'int' and right_type == 'int':
+                    return 'float' if node.operator == '/' else 'int'
+                # Si uno es string y el operador es +, es concatenación
+                if (left_type == 'str' or right_type == 'str') and node.operator == '+':
+                    return 'str'
+                return 'unknown'
+        elif isinstance(node, ListNode):
+            return 'list'
+        elif isinstance(node, CallNode):
+            if node.function == 'len':
+                return 'int'
+            elif node.function == 'range':
+                return 'range'
+            return 'unknown'
+        
+        return 'unknown'
     
-    def exit_scope(self):
-        """Exit current scope"""
-        if self.current_scope.parent:
-            self.current_scope = self.current_scope.parent
+    def check_type_compatibility(self, left_type, operator, right_type, line=0):
+        """Verifica compatibilidad de tipos en una operación"""
+        # Operadores aritméticos
+        if operator in ['+', '-', '*', '/', '%']:
+            # Suma de strings está permitida (concatenación)
+            if operator == '+' and (left_type == 'str' or right_type == 'str'):
+                if left_type != 'str' or right_type != 'str':
+                    self.error(
+                        f"No se puede concatenar {left_type} con {right_type}. "
+                        f"Ambos deben ser strings.",
+                        line
+                    )
+                    return False
+                return True
+            
+            # Operaciones numéricas
+            numeric_types = ['int', 'float']
+            if left_type not in numeric_types:
+                self.error(
+                    f"Operando izquierdo de '{operator}' debe ser numérico, "
+                    f"se encontró '{left_type}'",
+                    line
+                )
+                return False
+            if right_type not in numeric_types:
+                self.error(
+                    f"Operando derecho de '{operator}' debe ser numérico, "
+                    f"se encontró '{right_type}'",
+                    line
+                )
+                return False
+            
+            # Advertencia por división por cero si es literal
+            if operator == '/' and right_type == 'int':
+                self.warning("Posible división por cero", line)
+            
+            return True
+        
+        # Operadores de comparación
+        if operator in ['==', '!=', '<', '>', '<=', '>=']:
+            # Cualquier tipo se puede comparar con ==, !=
+            if operator in ['==', '!=']:
+                return True
+            # <, >, <=, >= requieren tipos compatibles (números o strings)
+            numeric_types = ['int', 'float']
+            if (left_type in numeric_types and right_type in numeric_types) or \
+               (left_type == 'str' and right_type == 'str'):
+                return True
+            else:
+                self.error(
+                    f"No se puede comparar '{left_type}' con '{right_type}' usando '{operator}'",
+                    line
+                )
+                return False
+        
+        return True
     
     def analyze(self, ast):
-        """Main entry point for semantic analysis"""
+        """Analiza el AST completo"""
         self.visit(ast)
         return len(self.errors) == 0
     
     def visit(self, node):
-        """Dispatch to appropriate visitor method"""
+        """Visita un nodo del AST"""
         method_name = f'visit_{node.__class__.__name__}'
         visitor = getattr(self, method_name, self.generic_visit)
         return visitor(node)
     
     def generic_visit(self, node):
-        """Default visitor for unknown node types"""
-        raise Exception(f'No visit method for {node.__class__.__name__}')
-    
-    # Visitor methods for each AST node type
+        """Visita genérica"""
+        pass
     
     def visit_ProgramNode(self, node):
-        """Visit program root node"""
+        """Visita el programa"""
         for statement in node.statements:
             self.visit(statement)
     
     def visit_AssignmentNode(self, node):
-        """
-        Semantic Action: Add/update variable in symbol table, infer type
-        """
-        # Evaluate expression type
-        expr_type = self.visit(node.expression)
+        """Visita una asignación"""
+        # Analizar la expresión del lado derecho
+        self.visit(node.expression)
         
-        # Check if variable already exists
-        if self.current_scope.exists(node.identifier):
-            # Update existing variable (dynamic typing allows type change)
-            self.current_scope.update(node.identifier, expr_type)
-        else:
-            # Define new variable
-            self.current_scope.define(node.identifier, expr_type)
+        # Inferir el tipo de la expresión
+        expr_type = self.infer_type(node.expression)
         
-        return expr_type
+        # Si la variable ya existe, verificar compatibilidad (advertencia)
+        if node.identifier in self.symbol_table:
+            old_type = self.symbol_table[node.identifier]['type']
+            if old_type != expr_type and expr_type != 'unknown':
+                self.warning(
+                    f"Variable '{node.identifier}' cambia de tipo de '{old_type}' a '{expr_type}'",
+                    node.line
+                )
+        
+        # Registrar o actualizar variable en la tabla de símbolos
+        self.symbol_table[node.identifier] = {
+            'type': expr_type,
+            'initialized': True,
+            'line': node.line
+        }
     
     def visit_PrintNode(self, node):
-        """Visit print statement"""
-        expr_type = self.visit(node.expression)
-        return None
+        """Visita un print"""
+        self.visit(node.expression)
     
     def visit_IfNode(self, node):
-        """
-        Semantic Action: Verify condition is valid, analyze blocks in new scopes
-        """
-        # Check condition
-        cond_type = self.visit(node.condition)
+        """Visita un condicional"""
+        # Verificar condición
+        self.visit(node.condition)
+        cond_type = self.infer_type(node.condition)
         
-        # Analyze then block
-        self.enter_scope()
-        for stmt in node.then_block.statements:
-            self.visit(stmt)
-        self.exit_scope()
+        if cond_type not in ['bool', 'int', 'float', 'unknown']:
+            self.warning(
+                f"La condición del if es de tipo '{cond_type}', se esperaba un valor booleano",
+                node.line
+            )
         
-        # Analyze elif blocks
+        # Visitar bloques
+        self.visit(node.then_block)
         for elif_cond, elif_block in node.elif_parts:
             self.visit(elif_cond)
-            self.enter_scope()
-            for stmt in elif_block.statements:
-                self.visit(stmt)
-            self.exit_scope()
-        
-        # Analyze else block
+            self.visit(elif_block)
         if node.else_block:
-            self.enter_scope()
-            for stmt in node.else_block.statements:
-                self.visit(stmt)
-            self.exit_scope()
-        
-        return None
+            self.visit(node.else_block)
     
     def visit_WhileNode(self, node):
-        """
-        Semantic Action: Verify condition, analyze block in new scope
-        """
-        # Check condition
-        cond_type = self.visit(node.condition)
+        """Visita un bucle while"""
+        self.visit(node.condition)
+        cond_type = self.infer_type(node.condition)
         
-        # Analyze block
-        self.enter_scope()
-        for stmt in node.block.statements:
-            self.visit(stmt)
-        self.exit_scope()
+        if cond_type not in ['bool', 'int', 'float', 'unknown']:
+            self.warning(
+                f"La condición del while es de tipo '{cond_type}', se esperaba un valor booleano",
+                node.line
+            )
         
-        return None
+        self.visit(node.block)
     
     def visit_ForNode(self, node):
-        """
-        Semantic Action: Verify range is numeric, define loop variable, analyze block
-        """
-        # Check range expression is numeric
-        range_type = self.visit(node.range_expr)
-        if range_type not in ('int', 'float', 'number'):
-            self.error(f"Range expression must be numeric, got {range_type}", node.line)
+        """Visita un bucle for"""
+        # Verificar el iterable
+        self.visit(node.iterable)
+        iter_type = self.infer_type(node.iterable)
         
-        # Enter new scope and define loop variable
-        self.enter_scope()
-        self.current_scope.define(node.identifier, 'int')
+        if iter_type not in ['range', 'list', 'unknown']:
+            self.error(
+                f"El for requiere un iterable (range o lista), se encontró '{iter_type}'",
+                node.line
+            )
         
-        # Analyze block
-        for stmt in node.block.statements:
-            self.visit(stmt)
+        # Registrar variable del iterador
+        self.symbol_table[node.identifier] = {
+            'type': 'int',
+            'initialized': True,
+            'line': node.line
+        }
         
-        self.exit_scope()
-        return None
+        self.visit(node.block)
     
     def visit_BinaryOpNode(self, node):
-        """
-        Semantic Action: Type check operands, determine result type
-        """
-        left_type = self.visit(node.left)
-        right_type = self.visit(node.right)
+        """Visita una operación binaria"""
+        # Visitar operandos
+        self.visit(node.left)
+        self.visit(node.right)
         
-        # Arithmetic operators
-        if node.operator in ('+', '-', '*', '/'):
-            # String concatenation with +
-            if node.operator == '+' and left_type == 'string' and right_type == 'string':
-                return 'string'
-            
-            # Numeric operations
-            if left_type in ('int', 'float', 'number') and right_type in ('int', 'float', 'number'):
-                # Result is float if either operand is float
-                if left_type == 'float' or right_type == 'float':
-                    return 'float'
-                return 'int'
-            
-            # Type error
-            self.error(
-                f"Type mismatch in operation: {left_type} {node.operator} {right_type}",
-                node.line
-            )
-            return 'error'
+        # Obtener tipos
+        left_type = self.infer_type(node.left)
+        right_type = self.infer_type(node.right)
         
-        # Comparison operators
-        elif node.operator in ('==', '!=', '<', '>', '<=', '>='):
-            # Can compare same types
-            if left_type == right_type:
-                return 'bool'
-            # Can compare numeric types
-            if left_type in ('int', 'float', 'number') and right_type in ('int', 'float', 'number'):
-                return 'bool'
-            
-            self.warning(
-                f"Comparing different types: {left_type} {node.operator} {right_type}",
-                node.line
-            )
-            return 'bool'
-        
-        return 'unknown'
+        # Verificar compatibilidad
+        if left_type != 'unknown' and right_type != 'unknown':
+            self.check_type_compatibility(left_type, node.operator, right_type, node.line)
     
     def visit_UnaryOpNode(self, node):
-        """Visit unary operation"""
-        operand_type = self.visit(node.operand)
+        """Visita una operación unaria"""
+        self.visit(node.operand)
+        operand_type = self.infer_type(node.operand)
         
         if node.operator == '-':
-            if operand_type in ('int', 'float', 'number'):
-                return operand_type
-            else:
-                self.error(f"Cannot negate non-numeric type: {operand_type}", node.line)
-                return 'error'
-        
-        return 'unknown'
-    
-    def visit_NumberNode(self, node):
-        """
-        Semantic Action: Return numeric type
-        """
-        if isinstance(node.value, float):
-            return 'float'
-        return 'int'
-    
-    def visit_StringNode(self, node):
-        """
-        Semantic Action: Return string type
-        """
-        return 'string'
+            if operand_type not in ['int', 'float', 'unknown']:
+                self.error(
+                    f"El operador '-' requiere un operando numérico, se encontró '{operand_type}'",
+                    node.line
+                )
     
     def visit_IdentifierNode(self, node):
-        """
-        Semantic Action: Verify variable is declared, return its type
-        """
-        symbol = self.current_scope.lookup(node.name)
+        """Visita un identificador (uso de variable)"""
+        if node.name not in self.symbol_table:
+            self.error(
+                f"Variable '{node.name}' no está declarada antes de usarse",
+                node.line
+            )
+        elif not self.symbol_table[node.name]['initialized']:
+            self.warning(
+                f"Variable '{node.name}' podría no estar inicializada",
+                node.line
+            )
+    
+    def visit_NumberNode(self, node):
+        """Visita un número"""
+        pass
+    
+    def visit_StringNode(self, node):
+        """Visita un string"""
+        pass
+    
+    def visit_ListNode(self, node):
+        """Visita una lista"""
+        for element in node.elements:
+            self.visit(element)
+    
+    def visit_IndexNode(self, node):
+        """Visita un acceso por índice"""
+        self.visit(node.list_expr)
+        self.visit(node.index_expr)
         
-        if symbol is None:
-            self.error(f"Undefined variable: '{node.name}'", node.line)
-            return 'error'
+        list_type = self.infer_type(node.list_expr)
+        index_type = self.infer_type(node.index_expr)
         
-        if not symbol['initialized']:
-            self.warning(f"Variable '{node.name}' may not be initialized", node.line)
+        if list_type not in ['list', 'unknown']:
+            self.error(
+                f"El acceso por índice requiere una lista, se encontró '{list_type}'",
+                node.line
+            )
         
-        return symbol['type']
+        if index_type not in ['int', 'unknown']:
+            self.error(
+                f"El índice debe ser un entero, se encontró '{index_type}'",
+                node.line
+            )
+    
+    def visit_CallNode(self, node):
+        """Visita una llamada a función"""
+        # Visitar argumentos
+        for arg in node.args:
+            self.visit(arg)
+        
+        # Verificar funciones específicas
+        if node.function == 'range':
+            if len(node.args) == 0:
+                self.error("range() requiere al menos un argumento", 0)
+            elif len(node.args) > 0:
+                arg_type = self.infer_type(node.args[0])
+                if arg_type not in ['int', 'unknown']:
+                    self.error(
+                        f"range() requiere un argumento entero, se encontró '{arg_type}'",
+                        node.line
+                    )
+        elif node.function == 'len':
+            if len(node.args) != 1:
+                self.error("len() requiere exactamente un argumento", 0)
+            else:
+                arg_type = self.infer_type(node.args[0])
+                if arg_type not in ['list', 'str', 'unknown']:
+                    self.error(
+                        f"len() requiere una lista o string, se encontró '{arg_type}'",
+                        node.line
+                    )
     
     def visit_BlockNode(self, node):
-        """Visit block of statements"""
-        for stmt in node.statements:
-            self.visit(stmt)
-        return None
+        """Visita un bloque de código"""
+        for statement in node.statements:
+            self.visit(statement)
     
-    def get_symbol_table(self):
-        """Get the global symbol table for display"""
-        return self.global_scope.symbols
+    def get_report(self):
+        """Genera un reporte del análisis semántico"""
+        report = "ANÁLISIS SEMÁNTICO\n"
+        report += "=" * 100 + "\n\n"
+        
+        # Tabla de símbolos
+        report += "TABLA DE SÍMBOLOS\n"
+        report += "-" * 100 + "\n"
+        report += f"{'Variable':<20} {'Tipo':<15} {'Inicializada':<15} {'Línea':<10}\n"
+        report += "-" * 100 + "\n"
+        
+        for name, info in self.symbol_table.items():
+            report += f"{name:<20} {info['type']:<15} {'Sí' if info['initialized'] else 'No':<15} {info['line']:<10}\n"
+        
+        report += "\n"
+        
+        # Errores
+        if self.errors:
+            report += f"ERRORES SEMÁNTICOS ({len(self.errors)})\n"
+            report += "-" * 100 + "\n"
+            for i, error in enumerate(self.errors, 1):
+                report += f"{i}. {error}\n"
+            report += "\n"
+        
+        # Advertencias
+        if self.warnings:
+            report += f"ADVERTENCIAS ({len(self.warnings)})\n"
+            report += "-" * 100 + "\n"
+            for i, warning in enumerate(self.warnings, 1):
+                report += f"{i}. {warning}\n"
+            report += "\n"
+        
+        if not self.errors and not self.warnings:
+            report += "[OK] No se encontraron errores ni advertencias semánticas\n"
+        
+        return report
