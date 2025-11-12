@@ -1,27 +1,180 @@
-Quiero que el compilador que tengo en Python, que actualmente genera código ensamblador genérico RISC de 32 bits, produzca código ensamblador compatible con el emulador emu8086.
+.model small
+.stack 100h
 
-El objetivo es poder ejecutar directamente el código ensamblador generado dentro del emu8086 sin tener que modificarlo manualmente.
+.data
+    str_0  DB '=== CÁLCULO DE FACTORIAL ===', 0Dh, 0Ah, '$'
+    str_in DB 0Dh,0Ah,'Ingrese un número: $'
+    str_out DB 0Dh,0Ah,'El factorial de ', '$'
+    str_es  DB ' es: ', '$'
+    newline DB 0Dh,0Ah,'$'
 
-Por tanto, necesito que:
+    t4 DB 6, ?, 6 DUP(?)   ; buffer de entrada
 
-Las instrucciones generadas sean válidas para la arquitectura x86 de 16 bits (8086).
+    n DW ?
+    resultado DW ?
+    valor DW ?
 
-Se usen registros como AX, BX, CX, DX en lugar de R0, R1, etc.
+.code
 
-Se usen directivas .model, .data, .code, INT 21h para impresión y salida.
+main PROC
+    mov ax, @data
+    mov ds, ax
 
-Las operaciones de memoria (LDR, STR) se traduzcan a MOV [var], AX o similares.
+    call user_main
 
-Las etiquetas, saltos y estructuras de control sigan funcionando igual.
+    mov ah, 4Ch
+    int 21h
+main ENDP
 
-En resumen: quiero que el generador de código ensamble un programa que pueda compilar y ejecutar sin errores en emu8086.
-**** por el moemnto solo has eso ya que quiero realizar lo siguiete pero aun no hagas nada de lo que te muestro a continuacion>
-Conocer las características principales del lenguaje máquina a fin de llevar un código intermedio y este pueda ser reconocido por el hardware. (Proyecto)
+;-------------------------------------------------------
+; factorial: calcula factorial(n) usando pila
+; Entrada: AX = n
+; Salida: AX = n!
+;-------------------------------------------------------
+factorial PROC
+    cmp ax, 1
+    jbe base_case
 
-Problema 1: Sistema de Gestión de Estudiantes
-Problema 2: Sistema de Inventario con Structs
-Problema 3: Sistema de Procesamiento de Cadenas
-Problema 4: Cálculo de Factorial con Recursión
+    push ax        ; guarda n actual
+    dec ax         ; n-1
+    call factorial ; factorial(n-1)
+    pop bx         ; recupera n original
+    mul bx         ; AX = factorial(n-1) * n
+    ret
 
-mi meta es hacerlos en python y ejecutarlos desde mi emulador y en python_ide_complete y despues que me genere mi codigo en ensamblador y codiogo intermedo y depues ejecutar el ensamblador directamente desde el emu...
+base_case:
+    mov ax, 1
+    ret
+factorial ENDP
 
+;-------------------------------------------------------
+; Convierte cadena en SI -> AX (entero)
+;-------------------------------------------------------
+string_to_int PROC
+    push bx
+    push cx
+    push dx
+    xor ax, ax
+    mov cx, 10
+s2i_loop:
+    mov bl, [si]
+    cmp bl, 0
+    je s2i_done
+    cmp bl, '0'
+    jl s2i_done
+    cmp bl, '9'
+    jg s2i_done
+    sub bl, '0'
+    mov bh, 0
+    mul cx
+    add ax, bx
+    inc si
+    jmp s2i_loop
+s2i_done:
+    pop dx
+    pop cx
+    pop bx
+    ret
+string_to_int ENDP
+
+;-------------------------------------------------------
+; Imprime número (AX)
+;-------------------------------------------------------
+print_number_inline PROC
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+
+    mov cx, 0
+    mov bx, 10
+    cmp ax, 0
+    jge pn_loop
+    neg ax
+    push ax
+    mov dl, '-'
+    mov ah, 02h
+    int 21h
+    pop ax
+pn_loop:
+    xor dx, dx
+    div bx
+    push dx
+    inc cx
+    cmp ax, 0
+    jne pn_loop
+pn_digits:
+    pop dx
+    add dl, '0'
+    mov ah, 02h
+    int 21h
+    loop pn_digits
+
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+print_number_inline ENDP
+
+;-------------------------------------------------------
+; Programa principal
+;-------------------------------------------------------
+user_main PROC
+    ; título
+    mov dx, OFFSET str_0
+    mov ah, 09h
+    int 21h
+
+    ; pedir número
+    mov dx, OFFSET str_in
+    mov ah, 09h
+    int 21h
+
+    ; leer número
+    mov dx, OFFSET t4
+    mov ah, 0Ah
+    int 21h
+
+    ; preparar cadena
+    mov si, OFFSET t4+2
+    mov cl, [t4+1]
+    add si, cx
+    mov byte ptr [si], 0
+    mov si, OFFSET t4+2
+
+    ; convertir
+    call string_to_int
+    mov n, ax
+    mov valor, ax
+
+    ; calcular factorial
+    mov ax, n
+    call factorial
+    mov resultado, ax
+
+    ; imprimir resultado
+    mov dx, OFFSET str_out
+    mov ah, 09h
+    int 21h
+
+    mov ax, valor
+    call print_number_inline
+
+    mov dx, OFFSET str_es
+    mov ah, 09h
+    int 21h
+
+    mov ax, resultado
+    call print_number_inline
+
+    mov dx, OFFSET newline
+    mov ah, 09h
+    int 21h
+
+    ret
+user_main ENDP
+
+END main

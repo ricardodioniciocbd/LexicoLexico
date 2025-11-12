@@ -29,6 +29,8 @@ class TACInstruction:
             return f"{self.result} = {self.arg1} {op_symbol} {self.arg2}"
         elif self.op == 'NEG':
             return f"{self.result} = -{self.arg1}"
+        elif self.op == 'NOT':
+            return f"{self.result} = not {self.arg1}"
         elif self.op == 'PRINT':
             return f"print({self.arg1})"
         elif self.op == 'LABEL':
@@ -41,6 +43,8 @@ class TACInstruction:
             return f"{self.result} = []"
         elif self.op == 'LIST_APPEND':
             return f"{self.arg1}.append({self.arg2})"
+        elif self.op == 'LIST_REMOVE':
+            return f"{self.arg1}.remove({self.arg2})"
         elif self.op == 'LIST_GET':
             return f"{self.result} = {self.arg1}[{self.arg2}]"
         elif self.op == 'LIST_SET':
@@ -50,6 +54,22 @@ class TACInstruction:
                 return f"{self.result} = {self.arg1}({self.arg2})"
             else:
                 return f"{self.result} = {self.arg1}()"
+        elif self.op == 'RETURN':
+            if self.arg1:
+                return f"return {self.arg1}"
+            else:
+                return "return"
+        elif self.op == 'DICT_CREATE':
+            return f"{self.result} = {{}}"
+        elif self.op == 'DICT_SET':
+            return f"{self.arg1}[{self.arg2}] = {self.result}"
+        elif self.op == 'DICT_GET':
+            return f"{self.result} = {self.arg1}[{self.arg2}]"
+        elif self.op == 'INPUT':
+            if self.arg1:
+                return f"{self.result} = input({self.arg1})"
+            else:
+                return f"{self.result} = input()"
         else:
             return f"{self.op} {self.arg1} {self.arg2} {self.result}"
 
@@ -61,6 +81,7 @@ class TACGenerator:
         self.instructions = []
         self.temp_counter = 0
         self.label_counter = 0
+        self.function_params = {}  # {nombre_funcion: [param1, param2, ...]}
     
     def new_temp(self):
         temp = f"t{self.temp_counter}"
@@ -91,15 +112,18 @@ class TACGenerator:
     
     def visit_ProgramNode(self, node):
         for statement in node.statements:
-            self.visit(statement)
+            if statement is not None:  # Ignorar None (break statements)
+                self.visit(statement)
     
     def visit_AssignmentNode(self, node):
         expr_result = self.visit(node.expression)
         self.emit('ASSIGN', expr_result, None, node.identifier)
     
     def visit_PrintNode(self, node):
-        expr_result = self.visit(node.expression)
-        self.emit('PRINT', expr_result)
+        # Imprimir cada expresión
+        for expr in node.expressions:
+            expr_result = self.visit(expr)
+            self.emit('PRINT', expr_result)
     
     def visit_IfNode(self, node):
         cond_result = self.visit(node.condition)
@@ -199,7 +223,10 @@ class TACGenerator:
     def visit_UnaryOpNode(self, node):
         operand_result = self.visit(node.operand)
         temp = self.new_temp()
-        self.emit('NEG', operand_result, None, temp)
+        if node.operator == 'not':
+            self.emit('NOT', operand_result, None, temp)
+        else:  # '-' negation
+            self.emit('NEG', operand_result, None, temp)
         return temp
     
     def visit_NumberNode(self, node):
@@ -223,7 +250,11 @@ class TACGenerator:
         list_result = self.visit(node.list_expr)
         index_result = self.visit(node.index_expr)
         temp = self.new_temp()
-        self.emit('LIST_GET', list_result, index_result, temp)
+        # Verificar si es un diccionario basado en el tipo de índice (string literal indica diccionario)
+        if isinstance(node.index_expr, StringNode):
+            self.emit('DICT_GET', list_result, index_result, temp)
+        else:
+            self.emit('LIST_GET', list_result, index_result, temp)
         return temp
     
     def visit_CallNode(self, node):
@@ -236,6 +267,12 @@ class TACGenerator:
             temp = self.new_temp()
             self.emit('CALL', 'len', arg_result, temp)
             return temp
+        elif node.function == 'int':
+            # Conversión de string a entero
+            arg_result = self.visit(node.args[0]) if node.args else None
+            temp = self.new_temp()
+            self.emit('CALL', 'int', arg_result, temp)
+            return temp
         elif '.' in node.function:
             parts = node.function.split('.')
             list_name = parts[0]
@@ -243,13 +280,88 @@ class TACGenerator:
             if method == 'append' and node.args:
                 arg_result = self.visit(node.args[0])
                 self.emit('LIST_APPEND', list_name, arg_result)
+            elif method == 'remove' and node.args:
+                arg_result = self.visit(node.args[0])
+                self.emit('LIST_REMOVE', list_name, arg_result)
             return list_name
         else:
-            args_str = ', '.join([self.visit(arg) for arg in node.args]) if node.args else None
+            # Llamada a función definida por el usuario
+            # Evaluar argumentos
+            args_results = []
+            for arg in node.args:
+                args_results.append(self.visit(arg))
+            
+            # NO emitir asignaciones de parámetros aquí
+            # El intérprete manejará la asignación de argumentos a parámetros
+            # en el contexto de la función llamada, no en el contexto actual
+            
+            # Emitir la llamada con los argumentos
+            args_str = ', '.join(args_results) if args_results else None
             temp = self.new_temp()
             self.emit('CALL', node.function, args_str, temp)
             return temp
     
     def visit_BlockNode(self, node):
         for statement in node.statements:
-            self.visit(statement)
+            if statement is not None:  # Ignorar None (break statements)
+                self.visit(statement)
+    
+    def visit_FunctionNode(self, node):
+        """Genera código TAC para definición de función"""
+        # Guardar información de parámetros
+        self.function_params[node.name] = node.parameters
+        
+        # Etiqueta para el inicio de la función
+        func_label = f"func_{node.name}"
+        self.emit('LABEL', func_label)
+        
+        # Los parámetros se asignarán cuando se llame la función
+        # Los argumentos se pasarán y se asignarán a los nombres de los parámetros
+        
+        # Generar código para el cuerpo de la función
+        self.visit(node.body)
+        
+        # Si no hay return explícito al final, agregar return None implícito
+        # Verificar si el último statement del bloque es RETURN
+        has_return = False
+        if node.body.statements:
+            for stmt in reversed(node.body.statements):
+                if isinstance(stmt, ReturnNode):
+                    has_return = True
+                    break
+                # Si encontramos otro tipo de statement antes de RETURN, no agregar return implícito
+                if not isinstance(stmt, (ReturnNode, BlockNode)):
+                    break
+        
+        if not has_return:
+            self.emit('RETURN', None)
+    
+    def visit_ReturnNode(self, node):
+        """Genera código TAC para return"""
+        if node.expression:
+            expr_result = self.visit(node.expression)
+            self.emit('RETURN', expr_result)
+        else:
+            self.emit('RETURN', None)
+    
+    def visit_DictNode(self, node):
+        """Genera código TAC para diccionario"""
+        temp_dict = self.new_temp()
+        self.emit('DICT_CREATE', None, None, temp_dict)
+        
+        for key, value in node.items:
+            key_result = self.visit(key)
+            value_result = self.visit(value)
+            self.emit('DICT_SET', temp_dict, key_result, value_result)
+        
+        return temp_dict
+    
+    def visit_InputNode(self, node):
+        """Genera código TAC para input()"""
+        temp = self.new_temp()
+        if node.prompt:
+            prompt_result = self.visit(node.prompt)
+            self.emit('INPUT', prompt_result, None, temp)
+        else:
+            self.emit('INPUT', None, None, temp)
+        return temp

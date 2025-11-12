@@ -110,6 +110,12 @@ class TACOptimizer:
                         used_vars.add(instr.arg2)
                         changed = True
                 
+                # IMPORTANTE: Las variables usadas en RETURN son necesarias
+                if instr.op == 'RETURN':
+                    if instr.arg1 and instr.arg1 not in used_vars:
+                        used_vars.add(instr.arg1)
+                        changed = True
+                
                 if instr.op in ['PRINT', 'IF_FALSE']:
                     if instr.arg1 and instr.arg1 not in used_vars:
                         used_vars.add(instr.arg1)
@@ -142,8 +148,9 @@ class TACOptimizer:
         for instr in instructions:
             keep = True
             
+            # IMPORTANTE: RETURN debe mantenerse siempre
             if instr.op in ['PRINT', 'LABEL', 'GOTO', 'IF_FALSE', 'LIST_CREATE', 
-                           'LIST_APPEND', 'LIST_GET', 'LIST_SET', 'CALL']:
+                           'LIST_APPEND', 'LIST_GET', 'LIST_SET', 'CALL', 'RETURN', 'INPUT']:
                 keep = True
             elif instr.result:
                 keep = instr.result in used_vars

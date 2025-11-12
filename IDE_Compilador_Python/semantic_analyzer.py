@@ -63,12 +63,35 @@ class SemanticAnalyzer:
                 return 'unknown'
         elif isinstance(node, ListNode):
             return 'list'
+        elif isinstance(node, DictNode):
+            return 'dict'
+        elif isinstance(node, InputNode):
+            return 'str'  # input() siempre devuelve string
+        elif isinstance(node, IndexNode):
+            list_type = self.infer_type(node.list_expr)
+            if list_type == 'list':
+                return 'unknown'  # Tipo del elemento desconocido
+            elif list_type == 'dict':
+                return 'unknown'  # Tipo del valor desconocido
+            return 'unknown'
         elif isinstance(node, CallNode):
             if node.function == 'len':
                 return 'int'
             elif node.function == 'range':
                 return 'range'
+            elif node.function == 'input':
+                return 'str'
+            elif node.function == 'int':
+                return 'int'
+            elif node.function in self.symbol_table and self.symbol_table[node.function]['type'] == 'function':
+                return 'unknown'  # Tipo de retorno desconocido por ahora
             return 'unknown'
+        elif isinstance(node, FunctionNode):
+            return 'function'
+        elif isinstance(node, ReturnNode):
+            if node.expression:
+                return self.infer_type(node.expression)
+            return 'None'
         
         return 'unknown'
     
@@ -175,7 +198,8 @@ class SemanticAnalyzer:
     
     def visit_PrintNode(self, node):
         """Visita un print"""
-        self.visit(node.expression)
+        for expr in node.expressions:
+            self.visit(expr)
     
     def visit_IfNode(self, node):
         """Visita un condicional"""
@@ -335,6 +359,50 @@ class SemanticAnalyzer:
         """Visita un bloque de código"""
         for statement in node.statements:
             self.visit(statement)
+    
+    def visit_FunctionNode(self, node):
+        """Visita una definición de función"""
+        # Registrar la función en la tabla de símbolos
+        self.symbol_table[node.name] = {
+            'type': 'function',
+            'initialized': True,
+            'line': node.line,
+            'parameters': node.parameters
+        }
+        
+        # Crear nuevo ámbito para la función
+        old_symbol_table = self.symbol_table.copy()
+        self.symbol_table = {}
+        
+        # Registrar parámetros como variables locales
+        for param in node.parameters:
+            self.symbol_table[param] = {
+                'type': 'unknown',
+                'initialized': True,
+                'line': node.line
+            }
+        
+        # Analizar el cuerpo de la función
+        self.visit(node.body)
+        
+        # Restaurar el ámbito anterior
+        self.symbol_table = old_symbol_table
+    
+    def visit_ReturnNode(self, node):
+        """Visita un return"""
+        if node.expression:
+            self.visit(node.expression)
+    
+    def visit_DictNode(self, node):
+        """Visita un diccionario"""
+        for key, value in node.items:
+            self.visit(key)
+            self.visit(value)
+    
+    def visit_InputNode(self, node):
+        """Visita una llamada a input()"""
+        if node.prompt:
+            self.visit(node.prompt)
     
     def get_report(self):
         """Genera un reporte del análisis semántico"""

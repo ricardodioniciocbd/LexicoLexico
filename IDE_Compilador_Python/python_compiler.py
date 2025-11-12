@@ -48,6 +48,7 @@ class TokenType(Enum):
     DIVIDE = auto()
     MODULO = auto()
     POWER = auto()
+    NOT = auto()  # Operador not para negación booleana
     
     # Comparación
     EQUAL = auto()
@@ -65,9 +66,20 @@ class TokenType(Enum):
     RPAREN = auto()
     LBRACKET = auto()
     RBRACKET = auto()
+    LBRACE = auto()      # {
+    RBRACE = auto()      # }
     COLON = auto()
     COMMA = auto()
     DOT = auto()
+    
+    # Funciones built-in
+    INPUT = auto()
+    OPEN = auto()
+    READ = auto()
+    WRITE = auto()
+    CLOSE = auto()
+    REMOVE = auto()  # Método remove para listas
+    BREAK = auto()   # Palabra clave break
     
     # Especiales
     NEWLINE = auto()
@@ -100,13 +112,20 @@ KEYWORDS = {
     'range': TokenType.RANGE,
     'print': TokenType.PRINT,
     'len': TokenType.LEN,
-    'append': TokenType.APPEND,
+    # 'append': TokenType.APPEND,  # No debe ser palabra reservada, es un método
+    'input': TokenType.INPUT,
+    'open': TokenType.OPEN,
+    'read': TokenType.READ,
+    'write': TokenType.WRITE,
+    'close': TokenType.CLOSE,
     'True': TokenType.TRUE,
     'False': TokenType.FALSE,
     'None': TokenType.NONE,
     'int': TokenType.INT,
     'float': TokenType.FLOAT,
     'str': TokenType.STR,
+    'not': TokenType.NOT,
+    'break': TokenType.BREAK,  # Agregar también break para bucles
 }
 
 
@@ -300,6 +319,12 @@ class Lexer:
             elif char == ']':
                 self.advance()
                 self.tokens.append(Token(TokenType.RBRACKET, ']', start_line, start_column))
+            elif char == '{':
+                self.advance()
+                self.tokens.append(Token(TokenType.LBRACE, '{', start_line, start_column))
+            elif char == '}':
+                self.advance()
+                self.tokens.append(Token(TokenType.RBRACE, '}', start_line, start_column))
             elif char == ':':
                 self.advance()
                 self.tokens.append(Token(TokenType.COLON, ':', start_line, start_column))
@@ -336,8 +361,8 @@ class AssignmentNode(ASTNode):
         self.line = line
 
 class PrintNode(ASTNode):
-    def __init__(self, expression, line=0):
-        self.expression = expression
+    def __init__(self, expressions, line=0):
+        self.expressions = expressions  # Lista de expresiones para imprimir
         self.line = line
 
 class IfNode(ASTNode):
@@ -410,6 +435,28 @@ class BlockNode(ASTNode):
     def __init__(self, statements):
         self.statements = statements
 
+class FunctionNode(ASTNode):
+    def __init__(self, name, parameters, body, line=0):
+        self.name = name
+        self.parameters = parameters  # Lista de nombres de parámetros
+        self.body = body  # BlockNode
+        self.line = line
+
+class ReturnNode(ASTNode):
+    def __init__(self, expression, line=0):
+        self.expression = expression  # Puede ser None para return sin valor
+        self.line = line
+
+class DictNode(ASTNode):
+    def __init__(self, items, line=0):
+        self.items = items  # Lista de tuplas (clave, valor)
+        self.line = line
+
+class InputNode(ASTNode):
+    def __init__(self, prompt=None, line=0):
+        self.prompt = prompt  # Expresión opcional para el prompt
+        self.line = line
+
 
 # ============= ANÁLISIS SINTÁCTICO =============
 
@@ -465,7 +512,11 @@ class Parser:
         self.skip_newlines()
         token_type = self.current_token.type
         
-        if token_type == TokenType.IDENTIFIER:
+        if token_type == TokenType.DEF:
+            return self.parse_function()
+        elif token_type == TokenType.RETURN:
+            return self.parse_return()
+        elif token_type == TokenType.IDENTIFIER:
             next_token = self.tokens[self.position + 1] if self.position + 1 < len(self.tokens) else None
             if next_token and next_token.type == TokenType.ASSIGN:
                 return self.parse_assignment()
@@ -483,6 +534,11 @@ class Parser:
             return self.parse_while()
         elif token_type == TokenType.FOR:
             return self.parse_for()
+        elif token_type == TokenType.BREAK:
+            # break statement - simplemente avanzar el token
+            self.advance()
+            self.skip_newlines()
+            return None  # break no necesita nodo AST especial por ahora
         else:
             self.error(f"Token inesperado: {self.current_token}")
     
@@ -504,12 +560,20 @@ class Parser:
         return AssignmentNode(f"{identifier}[INDEX]", value_expr, line)
     
     def parse_print(self):
+        """Parse print statement: print(expr1, expr2, ...)"""
         line = self.current_token.line
         self.expect(TokenType.PRINT)
         self.expect(TokenType.LPAREN)
-        expression = self.parse_expression()
+        
+        expressions = []
+        if self.current_token.type != TokenType.RPAREN:
+            expressions.append(self.parse_expression())
+            while self.current_token.type == TokenType.COMMA:
+                self.advance()
+                expressions.append(self.parse_expression())
+        
         self.expect(TokenType.RPAREN)
-        return PrintNode(expression, line)
+        return PrintNode(expressions, line)
     
     def parse_if(self):
         line = self.current_token.line
@@ -575,6 +639,70 @@ class Parser:
         
         return BlockNode(statements)
     
+    def parse_function(self):
+        """Parse function definition: def nombre(param1, param2): bloque"""
+        line = self.current_token.line
+        self.expect(TokenType.DEF)
+        name = self.expect(TokenType.IDENTIFIER).value
+        self.expect(TokenType.LPAREN)
+        
+        parameters = []
+        if self.current_token.type != TokenType.RPAREN:
+            parameters.append(self.expect(TokenType.IDENTIFIER).value)
+            while self.current_token.type == TokenType.COMMA:
+                self.advance()
+                parameters.append(self.expect(TokenType.IDENTIFIER).value)
+        self.expect(TokenType.RPAREN)
+        self.expect(TokenType.COLON)
+        self.skip_newlines()
+        body = self.parse_block()
+        
+        return FunctionNode(name, parameters, body, line)
+    
+    def parse_return(self):
+        """Parse return statement: return expresion"""
+        line = self.current_token.line
+        self.expect(TokenType.RETURN)
+        if self.current_token.type != TokenType.NEWLINE and self.current_token.type != TokenType.DEDENT:
+            expression = self.parse_expression()
+            return ReturnNode(expression, line)
+        return ReturnNode(None, line)
+    
+    def parse_dict(self):
+        """Parse dictionary: {clave1: valor1, clave2: valor2}"""
+        line = self.current_token.line
+        self.expect(TokenType.LBRACE)
+        items = []
+        
+        if self.current_token.type != TokenType.RBRACE:
+            key = self.parse_expression()
+            self.expect(TokenType.COLON)
+            value = self.parse_expression()
+            items.append((key, value))
+            
+            while self.current_token.type == TokenType.COMMA:
+                self.advance()
+                key = self.parse_expression()
+                self.expect(TokenType.COLON)
+                value = self.parse_expression()
+                items.append((key, value))
+        
+        self.expect(TokenType.RBRACE)
+        return DictNode(items, line)
+    
+    def parse_input(self):
+        """Parse input() call: input() or input(prompt)"""
+        line = self.current_token.line
+        self.expect(TokenType.INPUT)
+        self.expect(TokenType.LPAREN)
+        
+        prompt = None
+        if self.current_token.type != TokenType.RPAREN:
+            prompt = self.parse_expression()
+        
+        self.expect(TokenType.RPAREN)
+        return InputNode(prompt, line)
+    
     def parse_expression(self):
         return self.parse_comparison()
     
@@ -620,13 +748,34 @@ class Parser:
         elif token.type == TokenType.STRING:
             self.advance()
             return StringNode(token.value, token.line)
-        elif token.type == TokenType.IDENTIFIER:
+        elif token.type == TokenType.TRUE:
             self.advance()
-            if self.current_token.type == TokenType.LBRACKET:
+            return NumberNode(1, token.line)  # True = 1
+        elif token.type == TokenType.FALSE:
+            self.advance()
+            return NumberNode(0, token.line)  # False = 0
+        elif token.type == TokenType.NONE:
+            self.advance()
+            return NumberNode(0, token.line)  # None = 0 (para compatibilidad)
+        elif token.type == TokenType.IDENTIFIER:
+            name = token.value
+            self.advance()
+            if self.current_token.type == TokenType.LPAREN:
+                # Llamada a función
+                self.advance()
+                args = []
+                if self.current_token.type != TokenType.RPAREN:
+                    args.append(self.parse_expression())
+                    while self.current_token.type == TokenType.COMMA:
+                        self.advance()
+                        args.append(self.parse_expression())
+                self.expect(TokenType.RPAREN)
+                return CallNode(name, args, token.line)
+            elif self.current_token.type == TokenType.LBRACKET:
                 self.advance()
                 index_expr = self.parse_expression()
                 self.expect(TokenType.RBRACKET)
-                return IndexNode(IdentifierNode(token.value, token.line), index_expr, token.line)
+                return IndexNode(IdentifierNode(name, token.line), index_expr, token.line)
             elif self.current_token.type == TokenType.DOT:
                 self.advance()
                 method = self.expect(TokenType.IDENTIFIER).value
@@ -638,8 +787,8 @@ class Parser:
                         self.advance()
                         args.append(self.parse_expression())
                 self.expect(TokenType.RPAREN)
-                return CallNode(f"{token.value}.{method}", args, token.line)
-            return IdentifierNode(token.value, token.line)
+                return CallNode(f"{name}.{method}", args, token.line)
+            return IdentifierNode(name, token.line)
         elif token.type == TokenType.LBRACKET:
             self.advance()
             elements = []
@@ -650,12 +799,16 @@ class Parser:
                     elements.append(self.parse_expression())
             self.expect(TokenType.RBRACKET)
             return ListNode(elements, token.line)
+        elif token.type == TokenType.LBRACE:
+            return self.parse_dict()
+        elif token.type == TokenType.INPUT:
+            return self.parse_input()
         elif token.type == TokenType.LPAREN:
             self.advance()
             expr = self.parse_expression()
             self.expect(TokenType.RPAREN)
             return expr
-        elif token.type in (TokenType.RANGE, TokenType.LEN):
+        elif token.type in (TokenType.RANGE, TokenType.LEN, TokenType.INT):
             func_name = token.value
             self.advance()
             self.expect(TokenType.LPAREN)
@@ -671,5 +824,9 @@ class Parser:
             self.advance()
             operand = self.parse_factor()
             return UnaryOpNode('-', operand, token.line)
+        elif token.type == TokenType.NOT:
+            self.advance()
+            operand = self.parse_factor()
+            return UnaryOpNode('not', operand, token.line)
         else:
             self.error(f"Token inesperado en expresión: {token}")

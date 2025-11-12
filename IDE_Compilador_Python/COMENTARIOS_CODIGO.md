@@ -505,3 +505,6 @@ grep -r "Complejidad temporal" *.py
 **Propósito**: Facilitar identificación y comprensión del código
 
 
+
+
+
