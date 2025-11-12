@@ -1,6 +1,7 @@
 """
-Lexical Analyzer Module
-Performs tokenization of MiniLang source code
+Módulo de Análisis Léxico
+Realiza la tokenización del código fuente (convierte texto en tokens)
+PUNTO 2: Implementa Autómatas Finitos Deterministas (AFD)
 """
 
 import re
@@ -8,34 +9,40 @@ from token_types import Token, TokenType, KEYWORDS
 
 
 class LexerError(Exception):
-    """Exception raised for lexical analysis errors"""
+    """Excepción lanzada cuando hay errores léxicos"""
     pass
 
 
 class Lexer:
-    """Lexical analyzer for MiniLang"""
+    """
+    Analizador Léxico (Lexer) - PUNTO 2
+    Implementa AFD (Autómata Finito Determinista) para reconocer tokens
+    """
     
     def __init__(self, source_code):
         self.source = source_code
-        self.position = 0
-        self.line = 1
-        self.column = 1
-        self.tokens = []
-        self.indent_stack = [0]  # Track indentation levels
+        self.position = 0  # Posición actual en el código
+        self.line = 1  # Línea actual
+        self.column = 1  # Columna actual
+        self.tokens = []  # Lista de tokens generados
+        self.indent_stack = [0]  # Pila para rastrear niveles de indentación
         
     def error(self, message):
-        """Raise a lexer error with position information"""
-        raise LexerError(f"Lexer Error at line {self.line}, column {self.column}: {message}")
+        """Lanza un error léxico con información de posición"""
+        raise LexerError(f"Error Léxico en línea {self.line}, columna {self.column}: {message}")
     
     def peek(self, offset=0):
-        """Look ahead at character without consuming it"""
+        """
+        Lookahead: Mira el siguiente carácter sin consumirlo
+        Esencial para AFD con lookahead
+        """
         pos = self.position + offset
         if pos < len(self.source):
             return self.source[pos]
         return None
     
     def advance(self):
-        """Consume and return current character"""
+        """Consume y retorna el carácter actual (avanza en el código)"""
         if self.position < len(self.source):
             char = self.source[self.position]
             self.position += 1
@@ -48,18 +55,21 @@ class Lexer:
         return None
     
     def skip_whitespace(self):
-        """Skip spaces and tabs (but not newlines)"""
+        """Salta espacios y tabs (pero no saltos de línea)"""
         while self.peek() in ' \t':
             self.advance()
     
     def skip_comment(self):
-        """Skip single-line comments starting with # or //"""
+        """Salta comentarios de una línea que empiezan con # o //"""
         if self.peek() == '#' or (self.peek() == '/' and self.peek(1) == '/'):
             while self.peek() and self.peek() != '\n':
                 self.advance()
     
     def read_number(self):
-        """Read a numeric literal (integer or float)"""
+        """
+        AFD para leer números (enteros o flotantes)
+        Estados: q0 → q1 (dígitos) → q2 (punto) → q3 (más dígitos)
+        """
         start_line = self.line
         start_column = self.column
         num_str = ''
@@ -67,7 +77,7 @@ class Lexer:
         while self.peek() and (self.peek().isdigit() or self.peek() == '.'):
             num_str += self.advance()
         
-        # Convert to appropriate numeric type
+        # Convertir a tipo numérico apropiado
         try:
             if '.' in num_str:
                 value = float(num_str)
@@ -75,10 +85,13 @@ class Lexer:
                 value = int(num_str)
             return Token(TokenType.NUMBER, value, start_line, start_column)
         except ValueError:
-            self.error(f"Invalid number format: {num_str}")
+            self.error(f"Formato de número inválido: {num_str}")
     
     def read_string(self):
-        """Read a string literal enclosed in quotes"""
+        """
+        AFD para leer cadenas de texto (strings) encerradas en comillas
+        Maneja secuencias de escape como \n, \t, etc.
+        """
         start_line = self.line
         start_column = self.column
         quote_char = self.advance()  # Consume opening quote
@@ -88,20 +101,23 @@ class Lexer:
             if self.peek() == '\\':
                 self.advance()
                 next_char = self.advance()
-                # Handle escape sequences
+                # Manejar secuencias de escape
                 escape_map = {'n': '\n', 't': '\t', 'r': '\r', '\\': '\\', '"': '"', "'": "'"}
                 string_value += escape_map.get(next_char, next_char)
             else:
                 string_value += self.advance()
         
         if self.peek() != quote_char:
-            self.error("Unterminated string literal")
+            self.error("Cadena de texto sin cerrar (falta comilla final)")
         
-        self.advance()  # Consume closing quote
+        self.advance()  # Consumir comilla de cierre
         return Token(TokenType.STRING, string_value, start_line, start_column)
     
     def read_identifier(self):
-        """Read an identifier or keyword"""
+        """
+        AFD para leer identificadores o palabras clave
+        Estados: q0 --[letra|_]--> q1 --[letra|dígito|_]--> q1 (ACEPTA)
+        """
         start_line = self.line
         start_column = self.column
         identifier = ''
@@ -109,12 +125,15 @@ class Lexer:
         while self.peek() and (self.peek().isalnum() or self.peek() == '_'):
             identifier += self.advance()
         
-        # Check if it's a keyword
+        # Verificar si es una palabra clave (keyword)
         token_type = KEYWORDS.get(identifier, TokenType.IDENTIFIER)
         return Token(token_type, identifier, start_line, start_column)
     
     def handle_indentation(self, indent_level):
-        """Generate INDENT/DEDENT tokens based on indentation changes"""
+        """
+        Genera tokens INDENT/DEDENT basado en cambios de indentación
+        Importante para lenguajes como Python que usan indentación significativa
+        """
         tokens = []
         current_indent = self.indent_stack[-1]
         
@@ -127,12 +146,15 @@ class Lexer:
                 tokens.append(Token(TokenType.DEDENT, indent_level, self.line, 1))
             
             if not self.indent_stack or self.indent_stack[-1] != indent_level:
-                self.error("Inconsistent indentation")
+                self.error("Indentación inconsistente")
         
         return tokens
     
     def tokenize(self):
-        """Main tokenization method - converts source code to tokens"""
+        """
+        Método principal de tokenización - convierte código fuente en tokens
+        Este es el punto de entrada del análisis léxico
+        """
         self.tokens = []
         at_line_start = True
         

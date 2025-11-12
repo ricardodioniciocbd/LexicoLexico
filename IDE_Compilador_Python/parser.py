@@ -1,6 +1,7 @@
 """
-Syntax Analyzer (Parser) Module
-Performs syntax analysis and builds Abstract Syntax Tree (AST)
+Módulo de Análisis Sintáctico (Parser)
+Realiza el análisis sintáctico y construye el Árbol de Sintaxis Abstracta (AST)
+PUNTO 3: Implementa Gramática Libre de Contexto (CFG) tipo LL(1)
 """
 
 from token_types import TokenType
@@ -8,12 +9,16 @@ from ast_nodes import *
 
 
 class ParserError(Exception):
-    """Exception raised for syntax errors"""
+    """Excepción lanzada cuando hay errores sintácticos"""
     pass
 
 
 class Parser:
-    """Recursive descent parser for MiniLang"""
+    """
+    Parser de Descenso Recursivo - PUNTO 3
+    Implementa análisis sintáctico LL(1) sin recursión izquierda
+    Construye el AST (Árbol de Sintaxis Abstracta)
+    """
     
     def __init__(self, tokens):
         self.tokens = tokens
@@ -21,51 +26,51 @@ class Parser:
         self.current_token = self.tokens[0] if tokens else None
     
     def error(self, message):
-        """Raise a parser error with current token information"""
+        """Lanza un error sintáctico con información del token actual"""
         if self.current_token:
             raise ParserError(
-                f"Parser Error at line {self.current_token.line}, "
-                f"column {self.current_token.column}: {message}\n"
-                f"Current token: {self.current_token}"
+                f"Error Sintáctico en línea {self.current_token.line}, "
+                f"columna {self.current_token.column}: {message}\n"
+                f"Token actual: {self.current_token}"
             )
         else:
-            raise ParserError(f"Parser Error: {message}")
+            raise ParserError(f"Error Sintáctico: {message}")
     
     def peek(self, offset=0):
-        """Look ahead at token without consuming it"""
+        """Lookahead: Mira el siguiente token sin consumirlo"""
         pos = self.position + offset
         if pos < len(self.tokens):
             return self.tokens[pos]
         return None
     
     def advance(self):
-        """Move to next token"""
+        """Avanza al siguiente token"""
         if self.position < len(self.tokens) - 1:
             self.position += 1
             self.current_token = self.tokens[self.position]
         return self.current_token
     
     def expect(self, token_type):
-        """Consume token of expected type or raise error"""
+        """Consume token del tipo esperado o lanza error"""
         if self.current_token.type != token_type:
-            self.error(f"Expected {token_type.name}, got {self.current_token.type.name}")
+            self.error(f"Se esperaba {token_type.name}, se encontró {self.current_token.type.name}")
         token = self.current_token
         self.advance()
         return token
     
     def skip_newlines(self):
-        """Skip any newline tokens"""
+        """Salta tokens de nueva línea (NEWLINE)"""
         while self.current_token and self.current_token.type == TokenType.NEWLINE:
             self.advance()
     
     def parse(self):
-        """Main entry point - parse entire program"""
+        """Punto de entrada principal - analiza todo el programa"""
         return self.parse_program()
     
     def parse_program(self):
         """
-        programa → declaraciones
-        Semantic Action: Create ProgramNode with list of statements
+        Producción: programa → declaraciones
+        Acción Semántica: Crea ProgramNode con lista de sentencias
         """
         statements = []
         self.skip_newlines()

@@ -14,7 +14,7 @@ from machine_code_generator import MachineCodeGenerator
 from reglas_semanticas import REGLAS_SEMANTICAS, obtener_reglas_por_fase, obtener_nombre_fase
 
 
-# Colores Dark Mode profesional
+# Colores Dark Mode
 COLORS = {
     'bg_gradient_start': '#1e1e1e',  # Negro suave
     'bg_gradient_end': '#2d2d30',    # Gris muy oscuro

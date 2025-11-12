@@ -1,13 +1,10 @@
-"""
-Token Types Definition Module
-Defines all token types used in the MiniLang compiler
-"""
+
 
 from enum import Enum, auto
 
 
 class TokenType(Enum):
-    """Enumeration of all token types in MiniLang"""
+   
     
     # Keywords
     PRINT = auto()
