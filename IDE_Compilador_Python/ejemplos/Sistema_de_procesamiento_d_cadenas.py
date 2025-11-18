@@ -10,8 +10,25 @@ def contar_vocales(texto):
     i = 0
     while i < len(texto):
         ch = texto[i]
-        if ch == 'a' or ch == 'e' or ch == 'i' or ch == 'o' or ch == 'u' \
-        or ch == 'A' or ch == 'E' or ch == 'I' or ch == 'O' or ch == 'U':
+        if ch == 'a':
+            contador = contador + 1
+        elif ch == 'e':
+            contador = contador + 1
+        elif ch == 'i':
+            contador = contador + 1
+        elif ch == 'o':
+            contador = contador + 1
+        elif ch == 'u':
+            contador = contador + 1
+        elif ch == 'A':
+            contador = contador + 1
+        elif ch == 'E':
+            contador = contador + 1
+        elif ch == 'I':
+            contador = contador + 1
+        elif ch == 'O':
+            contador = contador + 1
+        elif ch == 'U':
             contador = contador + 1
         i = i + 1
     return contador
@@ -52,16 +69,69 @@ def contar_caracter(texto, caracter):
 # ---------------------------------------
 # Convertir a mayúsculas (simplificado)
 # ---------------------------------------
+def convertir_a_mayuscula(caracter):
+    if caracter == 'a':
+        return 'A'
+    elif caracter == 'b':
+        return 'B'
+    elif caracter == 'c':
+        return 'C'
+    elif caracter == 'd':
+        return 'D'
+    elif caracter == 'e':
+        return 'E'
+    elif caracter == 'f':
+        return 'F'
+    elif caracter == 'g':
+        return 'G'
+    elif caracter == 'h':
+        return 'H'
+    elif caracter == 'i':
+        return 'I'
+    elif caracter == 'j':
+        return 'J'
+    elif caracter == 'k':
+        return 'K'
+    elif caracter == 'l':
+        return 'L'
+    elif caracter == 'm':
+        return 'M'
+    elif caracter == 'n':
+        return 'N'
+    elif caracter == 'o':
+        return 'O'
+    elif caracter == 'p':
+        return 'P'
+    elif caracter == 'q':
+        return 'Q'
+    elif caracter == 'r':
+        return 'R'
+    elif caracter == 's':
+        return 'S'
+    elif caracter == 't':
+        return 'T'
+    elif caracter == 'u':
+        return 'U'
+    elif caracter == 'v':
+        return 'V'
+    elif caracter == 'w':
+        return 'W'
+    elif caracter == 'x':
+        return 'X'
+    elif caracter == 'y':
+        return 'Y'
+    elif caracter == 'z':
+        return 'Z'
+    else:
+        return caracter
+
 def a_mayusculas(texto):
     resultado = ""
     i = 0
     while i < len(texto):
         ch = texto[i]
-        if ch >= 'a' and ch <= 'z':
-            mayus = chr(ord(ch) - 32)
-            resultado = resultado + mayus
-        else:
-            resultado = resultado + ch
+        mayus = convertir_a_mayuscula(ch)
+        resultado = resultado + mayus
         i = i + 1
     return resultado
 
@@ -106,11 +176,14 @@ def menu():
             print("En mayúsculas:", a_mayusculas(texto))
 
         elif opcion == "6":
-            print("👋 Saliendo...")
+            print(" Saliendo...")
         else:
-            print("⚠️ Opción inválida.")
+            print(" Opción inválida.")
 
 # ---------------------------------------
 # Programa principal
 # ---------------------------------------
-menu()
+def main():
+    menu()
+
+main()

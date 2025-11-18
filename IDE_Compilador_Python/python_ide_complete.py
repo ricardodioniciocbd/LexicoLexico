@@ -1025,15 +1025,15 @@ class PythonCompilerIDE:
             self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
     
     def load_inventory_struct_example(self):
-        """Carga el ejemplo del Sistema de Inventario simplificado (compatible)"""
+        """Carga el ejemplo del Sistema de Inventario con diccionarios"""
         try:
-            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_inventario_SIMPLE.py')
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_inventario_DICCIONARIO.py')
             with open(file_path, 'r', encoding='utf-8') as f:
                 code = f.read()
             self.code_editor.delete('1.0', 'end')
             self.code_editor.insert('1.0', code)
             self.update_line_numbers()
-            self.status_bar.config(text="Ejemplo de Sistema de Inventario cargado (simplificado)", bg=COLORS['accent_green'], fg='#000000')
+            self.status_bar.config(text="Ejemplo de Sistema de Inventario con diccionarios cargado", bg=COLORS['accent_green'], fg='#000000')
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
             self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')

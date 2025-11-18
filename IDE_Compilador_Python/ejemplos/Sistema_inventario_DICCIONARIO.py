@@ -1,5 +1,5 @@
 # ============================================
-# Demostración de Diccionarios Básicos
+# Diccionarios Básicos
 # Compatible con el Compilador Python
 # ============================================
 
