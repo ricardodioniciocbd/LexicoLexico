@@ -15,10 +15,11 @@ class SemanticAnalyzer:
     """Analizador Semántico que verifica variables y tipos"""
     
     def __init__(self):
-        self.symbol_table = {}  # {nombre_variable: {'type': tipo, 'initialized': bool, 'line': linea}}
+        self.symbol_table = {}  # {nombre_variable: {'type': tipo, 'initialized': bool, 'line': linea, 'scope': scope}}
         self.errors = []
         self.warnings = []
         self.current_scope = 'global'
+        self.global_symbols = {}  # Tabla de símbolos globales separada
     
     def error(self, message, line=0):
         """Registra un error semántico"""
@@ -169,8 +170,12 @@ class SemanticAnalyzer:
     
     def visit_ProgramNode(self, node):
         """Visita el programa"""
+        self.current_scope = 'global'
+        self.global_symbols = {}  # Reiniciar símbolos globales
         for statement in node.statements:
             self.visit(statement)
+        # Guardar símbolos globales al final
+        self.global_symbols = {k: v for k, v in self.symbol_table.items() if v.get('scope') == 'global'}
     
     def visit_AssignmentNode(self, node):
         """Visita una asignación"""
@@ -190,11 +195,21 @@ class SemanticAnalyzer:
                 )
         
         # Registrar o actualizar variable en la tabla de símbolos
-        self.symbol_table[node.identifier] = {
-            'type': expr_type,
-            'initialized': True,
-            'line': node.line
-        }
+        if node.identifier not in self.symbol_table:
+            self.symbol_table[node.identifier] = {
+                'type': expr_type,
+                'initialized': True,
+                'line': node.line,
+                'scope': self.current_scope
+            }
+        else:
+            # Actualizar variable existente
+            self.symbol_table[node.identifier]['initialized'] = True
+            self.symbol_table[node.identifier]['type'] = expr_type
+        
+        # Si estamos en scope global, actualizar también global_symbols
+        if self.current_scope == 'global':
+            self.global_symbols[node.identifier] = self.symbol_table[node.identifier].copy()
     
     def visit_PrintNode(self, node):
         """Visita un print"""
@@ -283,14 +298,20 @@ class SemanticAnalyzer:
     
     def visit_IdentifierNode(self, node):
         """Visita un identificador (uso de variable)"""
-        if node.name not in self.symbol_table:
+        # Buscar en el scope actual primero
+        if node.name in self.symbol_table:
+            if not self.symbol_table[node.name]['initialized']:
+                self.warning(
+                    f"Variable '{node.name}' podría no estar inicializada",
+                    node.line
+                )
+        # Si no está en el scope actual, buscar en símbolos globales
+        elif node.name in self.global_symbols:
+            # Variable global encontrada, está bien
+            pass
+        else:
             self.error(
                 f"Variable '{node.name}' no está declarada antes de usarse",
-                node.line
-            )
-        elif not self.symbol_table[node.name]['initialized']:
-            self.warning(
-                f"Variable '{node.name}' podría no estar inicializada",
                 node.line
             )
     
@@ -315,17 +336,27 @@ class SemanticAnalyzer:
         list_type = self.infer_type(node.list_expr)
         index_type = self.infer_type(node.index_expr)
         
-        if list_type not in ['list', 'unknown']:
-            self.error(
-                f"El acceso por índice requiere una lista, se encontró '{list_type}'",
-                node.line
-            )
+        # Verificar si el índice es un string literal (acceso a diccionario)
+        is_string_index = isinstance(node.index_expr, StringNode)
         
-        if index_type not in ['int', 'unknown']:
-            self.error(
-                f"El índice debe ser un entero, se encontró '{index_type}'",
-                node.line
-            )
+        if is_string_index:
+            # Acceso a diccionario con clave string
+            if list_type not in ['dict', 'list', 'unknown']:
+                # Permitir acceso a listas de diccionarios también
+                pass  # No generar error, puede ser una lista de diccionarios
+        else:
+            # Acceso a lista con índice numérico
+            if list_type not in ['list', 'unknown']:
+                self.error(
+                    f"El acceso por índice requiere una lista, se encontró '{list_type}'",
+                    node.line
+                )
+            
+            if index_type not in ['int', 'unknown']:
+                self.error(
+                    f"El índice debe ser un entero, se encontró '{index_type}'",
+                    node.line
+                )
     
     def visit_CallNode(self, node):
         """Visita una llamada a función"""
@@ -362,24 +393,33 @@ class SemanticAnalyzer:
     
     def visit_FunctionNode(self, node):
         """Visita una definición de función"""
-        # Registrar la función en la tabla de símbolos
+        # Registrar la función en la tabla de símbolos global
         self.symbol_table[node.name] = {
             'type': 'function',
             'initialized': True,
             'line': node.line,
-            'parameters': node.parameters
+            'parameters': node.parameters,
+            'scope': 'global'
         }
         
         # Crear nuevo ámbito para la función
         old_symbol_table = self.symbol_table.copy()
+        old_scope = self.current_scope
+        self.current_scope = 'local'
         self.symbol_table = {}
+        
+        # Copiar variables globales al nuevo scope (para acceso a variables globales)
+        for var_name, var_info in self.global_symbols.items():
+            self.symbol_table[var_name] = var_info.copy()
+            self.symbol_table[var_name]['scope'] = 'global'  # Marcar como global
         
         # Registrar parámetros como variables locales
         for param in node.parameters:
             self.symbol_table[param] = {
                 'type': 'unknown',
                 'initialized': True,
-                'line': node.line
+                'line': node.line,
+                'scope': 'local'
             }
         
         # Analizar el cuerpo de la función
@@ -387,6 +427,7 @@ class SemanticAnalyzer:
         
         # Restaurar el ámbito anterior
         self.symbol_table = old_symbol_table
+        self.current_scope = old_scope
     
     def visit_ReturnNode(self, node):
         """Visita un return"""

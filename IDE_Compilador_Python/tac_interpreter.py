@@ -357,19 +357,20 @@ class TACInterpreter:
                     self.call_stack.append({
                         'pc': self.pc + 1,  # Continuar después de esta instrucción
                         'variables': saved_vars,
-                        'result_var': instr.result  # Variable donde guardar el resultado
+                        'result_var': instr.result,  # Variable donde guardar el resultado
+                        'func_name': instr.arg1  # Nombre de la función para identificar parámetros
                     })
                     
                     # Obtener nombres de parámetros desde function_info
                     func_info = self.function_info.get(instr.arg1, {})
                     func_params = func_info.get('params', [])
                     
-                    # Crear nuevo contexto de variables para la función (aislar parámetros)
-                    # Las variables del contexto anterior están guardadas en saved_vars
-                    # Creamos un nuevo diccionario para las variables locales de la función
-                    function_vars = {}
+                    # IMPORTANTE: Crear nuevo contexto de variables para la función
+                    # COPIANDO las variables globales del contexto anterior
+                    # Esto permite que las funciones accedan a variables globales como 'estudiantes'
+                    function_vars = saved_vars.copy()  # Copiar variables globales
                     
-                    # Asignar argumentos a parámetros en el nuevo contexto
+                    # Asignar argumentos a parámetros en el nuevo contexto (sobrescribir si existen)
                     if func_params:
                         # Usar los nombres de parámetros reales de la función
                         for i, param_name in enumerate(func_params):
@@ -411,20 +412,35 @@ class TACInterpreter:
                 saved_state = self.call_stack.pop()
                 # Guardar el valor de retorno antes de restaurar variables
                 result_var = saved_state.get('result_var')
-                # IMPORTANTE: Guardar las variables temporales creadas en esta función
-                # antes de restaurar el contexto anterior
-                temp_vars = {}
-                for var_name, var_value in self.variables.items():
-                    # Guardar variables temporales (empiezan con 't') y variables locales
-                    if var_name.startswith('t') or var_name not in saved_state['variables']:
-                        temp_vars[var_name] = var_value
+                
+                # IMPORTANTE: Guardar variables de la función antes de restaurar
+                function_vars = self.variables.copy()
                 
                 # Restaurar variables del contexto anterior
                 self.variables = saved_state['variables'].copy()
                 
-                # Agregar las variables temporales al contexto restaurado
-                # Esto permite que las variables temporales creadas en la función
-                # estén disponibles después del return
+                # IMPORTANTE: Actualizar variables globales modificadas en la función
+                # Si una variable global fue modificada en la función, actualizarla en el contexto global
+                func_name = saved_state.get('func_name', '')
+                func_info = self.function_info.get(func_name, {})
+                func_params = func_info.get('params', [])
+                
+                for var_name, var_value in function_vars.items():
+                    # Si la variable existe en el contexto global y no es un parámetro local
+                    if var_name in saved_state['variables']:
+                        # Verificar si es un parámetro de la función
+                        if var_name not in func_params:
+                            # Es una variable global, actualizarla
+                            self.variables[var_name] = var_value
+                    elif var_name not in func_params and not var_name.startswith('t'):
+                        # Nueva variable global creada en la función (no temporal)
+                        self.variables[var_name] = var_value
+                
+                # Agregar variables temporales creadas en la función
+                temp_vars = {}
+                for var_name, var_value in function_vars.items():
+                    if var_name.startswith('t'):
+                        temp_vars[var_name] = var_value
                 self.variables.update(temp_vars)
                 
                 # Asignar el valor de retorno a la variable resultado

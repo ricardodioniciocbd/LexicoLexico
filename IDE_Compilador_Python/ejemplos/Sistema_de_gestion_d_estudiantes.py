@@ -32,6 +32,8 @@ def menu():
             print(" Saliendo del sistema...")
         else:
             print(" Opción no válida.")
+
+            
 # ------------------------------
 # Función: agregar un estudiante
 # ------------------------------
@@ -46,14 +48,6 @@ def alta():
     estudiantes.append(nuevo)
 
     print(" Estudiante agregado correctamente.")
-
-# ------------------------------
-# Función: listar estudiantes
-# ------------------------------
-def listar():
-    print(" Lista de estudiantes:")
-    for e in estudiantes:
-        print("ID:", e["id"], "- Nombre:", e["nombre"], "- Edad:", e["edad"], "- Carrera:", e["carrera"], "- Promedio:", e["promedio"])
 
 # ------------------------------
 # Función: eliminar estudiante
@@ -96,10 +90,13 @@ def modificar():
     if not encontrado:
         print(" Estudiante no encontrado.")
 
-
-
-
-
+# ------------------------------
+# Función: listar estudiantes
+# ------------------------------
+def listar():
+    print(" Lista de estudiantes:")
+    for e in estudiantes:
+        print("ID:", e["id"], "- Nombre:", e["nombre"], "- Edad:", e["edad"], "- Carrera:", e["carrera"], "- Promedio:", e["promedio"])
 
 # ------------------------------
 # Programa principal

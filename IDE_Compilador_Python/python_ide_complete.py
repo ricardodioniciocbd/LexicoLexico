@@ -3,6 +3,7 @@ IDE Completo del Compilador de Python
 Con fondo azul gradiente y todas las fases de compilación
 """
 
+import os
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog, font as tkfont
 from python_compiler import *
@@ -83,9 +84,13 @@ class PythonCompilerIDE:
         self.optimized_tac = []
         self.machine_code = []
         self.execution_output = ""
+        self.input_pending = False
+        self.input_callback_var = None
+        self.input_prompt = ""
+        self.input_result = {'value': None, 'ready': False}
         
         self.setup_ui()
-        self.load_fibonacci_example()
+        self.load_factorial_example()
     
     def setup_ui(self):
         """Configura la interfaz de usuario"""
@@ -198,12 +203,11 @@ class PythonCompilerIDE:
         examples_label.pack(side=tk.LEFT, padx=10)
         
         # Radio buttons para ejemplos
-        self.example_var = tk.StringVar(value="fibonacci")
+        self.example_var = tk.StringVar(value="factorial")
         examples = [
-            ("Fibonacci", "fibonacci"),
-            ("Búsqueda", "busqueda"),
-            ("Listas", "listas"),
-            ("Con Errores", "errores")
+            ("Factorial", "factorial"),
+            ("Sistema Estudiantes", "estudiantes"),
+            ("Sistema Inventario", "inventario_struct")
         ]
         
         for label, value in examples:
@@ -427,10 +431,11 @@ class PythonCompilerIDE:
         self.machine_code_text.pack(fill=tk.BOTH, expand=True)
     
     def create_execution_tab(self):
-        """Crea la pestaña de Ejecución"""
+        """Crea la pestaña de Ejecución con entrada interactiva"""
         tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
         self.notebook.add(tab, text="▶️ Ejecución")
         
+        # Área de salida de ejecución (editable cuando se necesita entrada)
         self.execution_text = scrolledtext.ScrolledText(
             tab,
             bg=COLORS['bg_editor'],
@@ -438,9 +443,23 @@ class PythonCompilerIDE:
             font=tkfont.Font(family='Consolas', size=12, weight='bold'),
             relief=tk.FLAT,
             padx=15,
-            pady=15
+            pady=15,
+            state='normal',
+            wrap=tk.WORD
         )
-        self.execution_text.pack(fill=tk.BOTH, expand=True)
+        self.execution_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Variables para entrada interactiva
+        self.input_pending = False
+        self.input_callback_var = None
+        self.input_prompt_shown = False
+        self.input_start_mark = None
+        
+        # Bind para capturar Enter en execution_text cuando está en modo entrada
+        self.execution_text.bind('<KeyPress>', self.on_execution_text_key)
+        self.execution_text.bind('<Button-1>', self.on_execution_text_click)
+        self.input_prompt = ""
+        self.input_result = {'value': None, 'ready': False}
     
     def create_semantic_rules_tab(self):
         """Crea la pestaña de Reglas Semánticas"""
@@ -579,15 +598,91 @@ class PythonCompilerIDE:
             
             # Fase 7: Ejecución
             # Crear callback para entrada interactiva
-            def get_user_input(prompt=""):
-                """Callback para obtener entrada del usuario mediante diálogo"""
-                from tkinter import simpledialog
-                if prompt:
-                    return simpledialog.askstring("Entrada", prompt, parent=self.root)
-                else:
-                    return simpledialog.askstring("Entrada", "Ingrese un valor:", parent=self.root) or "5"
+            # Limpiar área de ejecución primero
+            self.execution_text.config(state='normal')
+            self.execution_text.delete('1.0', 'end')
+            self.execution_text.insert('1.0', "SALIDA DE LA EJECUCIÓN\n" + "=" * 120 + "\n\n")
+            self.execution_text.config(state='disabled')
+            self.execution_text.see('end')
+            self.execution_text.update()
             
-            interpreter = TACInterpreter(input_callback=get_user_input)
+            # Crear callback para entrada interactiva directamente en execution_text
+            def get_user_input(prompt=""):
+                """Callback para obtener entrada del usuario directamente en execution_text"""
+                # Habilitar edición en execution_text
+                self.execution_text.config(state='normal')
+                
+                # Formatear y mostrar el prompt en la consola de ejecución
+                if prompt:
+                    # Limpiar espacios al inicio y final del prompt
+                    prompt = prompt.strip()
+                    # Agregar espacio después del prompt si no termina en dos puntos o espacio
+                    if prompt and not prompt.endswith(':') and not prompt.endswith(' '):
+                        prompt = prompt + " "
+                    # Mostrar el prompt con formato mejorado
+                    self.execution_text.insert('end', prompt)
+                    self.execution_text.see('end')
+                    self.execution_text.update()
+                
+                # Marcar el inicio de la entrada del usuario
+                self.input_start_mark = self.execution_text.index('end-1c')
+                self.execution_text.mark_set('input_start', self.input_start_mark)
+                
+                # Configurar entrada pendiente
+                self.input_pending = True
+                self.input_prompt = prompt
+                self.input_prompt_shown = True
+                
+                # Crear variable para almacenar el resultado
+                result_var = {'value': None, 'ready': False}
+                
+                def set_input_value(value):
+                    result_var['value'] = value
+                    result_var['ready'] = True
+                
+                self.input_callback_var = set_input_value
+                
+                # Enfocar execution_text y mover cursor al final
+                self.execution_text.focus_set()
+                self.execution_text.mark_set(tk.INSERT, 'end-1c')
+                self.execution_text.see('end')
+                
+                # Esperar a que el usuario ingrese el valor
+                while not result_var['ready']:
+                    self.root.update()
+                    import time
+                    time.sleep(0.05)
+                
+                return result_var['value'] or ""
+            
+            # Crear wrapper del intérprete que muestre salida en tiempo real
+            class RealTimeInterpreter(TACInterpreter):
+                def __init__(self, execution_text_widget, input_callback):
+                    super().__init__(input_callback=input_callback)
+                    self.execution_text_widget = execution_text_widget
+                
+                def execute_instruction(self, instr, instructions=None):
+                    # Ejecutar la instrucción normalmente
+                    super().execute_instruction(instr, instructions)
+                    
+                    # Si es PRINT, mostrar inmediatamente en execution_text con formato mejorado
+                    if instr.op == 'PRINT':
+                        value = self.get_value(instr.arg1)
+                        output_str = str(value)
+                        # Agregar salida al widget en tiempo real con formato
+                        self.execution_text_widget.config(state='normal')
+                        # Si el output no termina en nueva línea, agregarla
+                        if output_str and not output_str.endswith('\n'):
+                            self.execution_text_widget.insert('end', output_str + '\n')
+                        else:
+                            self.execution_text_widget.insert('end', output_str)
+                        self.execution_text_widget.see('end')
+                        self.execution_text_widget.update()
+                        # Solo deshabilitar si no hay entrada pendiente
+                        if not hasattr(self.execution_text_widget.master.master, 'input_pending') or not self.execution_text_widget.master.master.input_pending:
+                            self.execution_text_widget.config(state='disabled')
+            
+            interpreter = RealTimeInterpreter(self.execution_text, get_user_input)
             self.execution_output = interpreter.interpret(self.optimized_tac, self.tac_generator.function_params)
             self.display_execution()
             
@@ -770,14 +865,112 @@ class PythonCompilerIDE:
     
     def display_execution(self):
         """Muestra la salida de ejecución"""
-        self.execution_text.delete('1.0', 'end')
+        # No sobrescribir si hay entrada pendiente - el contenido ya está en execution_text
+        if self.input_pending:
+            return
         
-        output = "SALIDA DE LA EJECUCIÓN\n"
-        output += "=" * 120 + "\n\n"
-        output += self.execution_output
-        output += "\n\n" + "=" * 120 + "\n"
+        # Habilitar edición temporalmente
+        self.execution_text.config(state='normal')
         
-        self.execution_text.insert('1.0', output)
+        # Si ya hay contenido de la ejecución interactiva, no hacer nada
+        # El contenido ya está en execution_text desde el callback
+        current_content = self.execution_text.get('1.0', 'end-1c')
+        
+        # Si no hay contenido o solo tiene el encabezado, agregar la salida
+        if not current_content or current_content.strip() == "SALIDA DE LA EJECUCIÓN" + "\n" + "=" * 120:
+            output = "SALIDA DE LA EJECUCIÓN\n"
+            output += "=" * 120 + "\n\n"
+            if self.execution_output:
+                output += self.execution_output
+            output += "\n\n" + "=" * 120 + "\n"
+            self.execution_text.insert('1.0', output)
+        
+        self.execution_text.see('end')
+        self.execution_text.config(state='disabled')
+    
+    
+    def on_execution_text_key(self, event):
+        """Maneja las teclas presionadas en execution_text cuando está en modo entrada"""
+        if not self.input_pending:
+            # Si no hay entrada pendiente, prevenir edición
+            if event.keysym not in ['Up', 'Down', 'Left', 'Right', 'Home', 'End', 'Page_Up', 'Page_Down']:
+                return 'break'
+            return None
+        
+        # Si hay entrada pendiente, permitir edición solo después del prompt
+        if event.keysym == 'Return':
+            # Capturar Enter para enviar el valor
+            self.on_execution_text_enter()
+            return 'break'
+        elif event.keysym == 'BackSpace':
+            # Permitir BackSpace solo si no está antes del inicio de entrada
+            current_pos = self.execution_text.index(tk.INSERT)
+            if self.input_start_mark:
+                start_pos = self.execution_text.index(self.input_start_mark)
+                if self.execution_text.compare(current_pos, '<=', start_pos):
+                    return 'break'
+        elif event.keysym in ['Up', 'Down', 'Left', 'Right', 'Home', 'End']:
+            # Permitir navegación
+            return None
+        elif event.char and ord(event.char) < 32:
+            # Permitir caracteres de control
+            return None
+        
+        # Permitir escritura solo después del prompt
+        if self.input_start_mark:
+            current_pos = self.execution_text.index(tk.INSERT)
+            start_pos = self.execution_text.index(self.input_start_mark)
+            if self.execution_text.compare(current_pos, '<', start_pos):
+                # Mover cursor al final si intenta escribir antes del prompt
+                self.execution_text.mark_set(tk.INSERT, 'end-1c')
+                return 'break'
+        
+        return None
+    
+    def on_execution_text_click(self, event):
+        """Maneja clicks en execution_text cuando está en modo entrada"""
+        if self.input_pending and self.input_start_mark:
+            # Si hay entrada pendiente, mover cursor al final si hace click antes del prompt
+            current_pos = self.execution_text.index(f"@{event.x},{event.y}")
+            start_pos = self.execution_text.index(self.input_start_mark)
+            if self.execution_text.compare(current_pos, '<', start_pos):
+                self.execution_text.mark_set(tk.INSERT, 'end-1c')
+                return 'break'
+    
+    def on_execution_text_enter(self):
+        """Captura Enter en execution_text y envía el valor ingresado"""
+        if self.input_pending and self.input_callback_var and self.input_start_mark:
+            # Obtener el texto ingresado después del prompt
+            start_pos = self.execution_text.index(self.input_start_mark)
+            end_pos = self.execution_text.index('end-1c')
+            value = self.execution_text.get(start_pos, end_pos).strip()
+            
+            # Si no hay valor, usar cadena vacía
+            if not value:
+                value = ""
+            
+            # Agregar nueva línea después del valor para mejor formato
+            current_end = self.execution_text.index('end-1c')
+            if self.execution_text.get(current_end, 'end') != '\n':
+                self.execution_text.insert('end', '\n')
+            
+            # Agregar línea en blanco para separar visualmente las entradas
+            self.execution_text.insert('end', '\n')
+            
+            self.execution_text.see('end')
+            self.execution_text.update()
+            
+            # Deshabilitar edición temporalmente
+            self.execution_text.config(state='disabled')
+            
+            # Llamar al callback con el valor
+            self.input_callback_var(value)
+            
+            # Resetear estado
+            self.input_pending = False
+            self.input_callback_var = None
+            self.input_prompt_shown = False
+            self.input_start_mark = None
     
     def clear_output(self):
         """Limpia todas las salidas"""
@@ -793,38 +986,57 @@ class PythonCompilerIDE:
     def load_selected_example(self):
         """Carga el ejemplo seleccionado"""
         example = self.example_var.get()
-        if example == "fibonacci":
-            self.load_fibonacci_example()
-        elif example == "busqueda":
-            self.load_search_example()
-        elif example == "listas":
-            self.load_list_processing_example()
-        elif example == "errores":
-            self.load_error_example()
+        if example == "factorial":
+            self.load_factorial_example()
+        elif example == "estudiantes":
+            self.load_estudiantes_example()
+        elif example == "inventario_struct":
+            self.load_inventory_struct_example()
+        elif example == "inventario_struct":
+            self.load_inventory_struct_example()
     
-    def load_fibonacci_example(self):
-        """Carga el ejemplo de Fibonacci"""
-        code = '''# Serie de Fibonacci
-n = 10
-a = 0
-b = 1
-
-print("Serie de Fibonacci:")
-print(a)
-print(b)
-
-i = 2
-while i < n:
-    c = a + b
-    print(c)
-    a = b
-    b = c
-    i = i + 1
-'''
-        self.code_editor.delete('1.0', 'end')
-        self.code_editor.insert('1.0', code)
-        self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo de Fibonacci cargado", bg=COLORS['accent_green'], fg='#000000')
+    def load_factorial_example(self):
+        """Carga el ejemplo de Factorial desde archivo"""
+        try:
+            import os
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Factorial_con_recursion.py')
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            self.code_editor.delete('1.0', 'end')
+            self.code_editor.insert('1.0', code)
+            self.update_line_numbers()
+            self.status_bar.config(text="Ejemplo de Factorial cargado", bg=COLORS['accent_green'], fg='#000000')
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
+            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+    
+    def load_estudiantes_example(self):
+        """Carga el ejemplo de Sistema de Estudiantes desde archivo"""
+        try:
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_de_gestion_d_estudiantes.py')
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            self.code_editor.delete('1.0', 'end')
+            self.code_editor.insert('1.0', code)
+            self.update_line_numbers()
+            self.status_bar.config(text="Ejemplo de Sistema de Estudiantes cargado", bg=COLORS['accent_green'], fg='#000000')
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
+            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+    
+    def load_inventory_struct_example(self):
+        """Carga el ejemplo del Sistema de Inventario simplificado (compatible)"""
+        try:
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_inventario_SIMPLE.py')
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            self.code_editor.delete('1.0', 'end')
+            self.code_editor.insert('1.0', code)
+            self.update_line_numbers()
+            self.status_bar.config(text="Ejemplo de Sistema de Inventario cargado (simplificado)", bg=COLORS['accent_green'], fg='#000000')
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
+            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
     
     def load_search_example(self):
         """Carga el ejemplo de búsqueda"""
@@ -1106,7 +1318,7 @@ class PythonCompilerIDE:
         self.execution_output = ""
         
         self.setup_ui()
-        self.load_fibonacci_example()
+        self.load_factorial_example()
     
     def setup_ui(self):
         """Configura la interfaz de usuario"""
@@ -1219,12 +1431,11 @@ class PythonCompilerIDE:
         examples_label.pack(side=tk.LEFT, padx=10)
         
         # Radio buttons para ejemplos
-        self.example_var = tk.StringVar(value="fibonacci")
+        self.example_var = tk.StringVar(value="factorial")
         examples = [
-            ("Fibonacci", "fibonacci"),
-            ("Búsqueda", "busqueda"),
-            ("Listas", "listas"),
-            ("Con Errores", "errores")
+            ("Factorial", "factorial"),
+            ("Sistema Estudiantes", "estudiantes"),
+            ("Sistema Inventario", "inventario_struct")
         ]
         
         for label, value in examples:
@@ -1790,38 +2001,40 @@ class PythonCompilerIDE:
     def load_selected_example(self):
         """Carga el ejemplo seleccionado"""
         example = self.example_var.get()
-        if example == "fibonacci":
-            self.load_fibonacci_example()
-        elif example == "busqueda":
-            self.load_search_example()
-        elif example == "listas":
-            self.load_list_processing_example()
-        elif example == "errores":
-            self.load_error_example()
+        if example == "factorial":
+            self.load_factorial_example()
+        elif example == "estudiantes":
+            self.load_estudiantes_example()
     
-    def load_fibonacci_example(self):
-        """Carga el ejemplo de Fibonacci"""
-        code = '''# Serie de Fibonacci
-n = 10
-a = 0
-b = 1
-
-print("Serie de Fibonacci:")
-print(a)
-print(b)
-
-i = 2
-while i < n:
-    c = a + b
-    print(c)
-    a = b
-    b = c
-    i = i + 1
-'''
-        self.code_editor.delete('1.0', 'end')
-        self.code_editor.insert('1.0', code)
-        self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo de Fibonacci cargado", bg=COLORS['accent_green'], fg='#000000')
+    def load_factorial_example(self):
+        """Carga el ejemplo de Factorial desde archivo"""
+        try:
+            import os
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Factorial_con_recursion.py')
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            self.code_editor.delete('1.0', 'end')
+            self.code_editor.insert('1.0', code)
+            self.update_line_numbers()
+            self.status_bar.config(text="Ejemplo de Factorial cargado", bg=COLORS['accent_green'], fg='#000000')
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
+            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+    
+    def load_estudiantes_example(self):
+        """Carga el ejemplo de Sistema de Estudiantes desde archivo"""
+        try:
+            import os
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_de_gestion_d_estudiantes.py')
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            self.code_editor.delete('1.0', 'end')
+            self.code_editor.insert('1.0', code)
+            self.update_line_numbers()
+            self.status_bar.config(text="Ejemplo de Sistema de Estudiantes cargado", bg=COLORS['accent_green'], fg='#000000')
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
+            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
     
     def load_search_example(self):
         """Carga el ejemplo de búsqueda"""
