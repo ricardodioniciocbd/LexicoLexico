@@ -1,0 +1,143 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║         IDE COMPILADOR INTERACTIVO DE PYTHON - GUÍA RÁPIDA             ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+┌─ INSTALACIÓN ─────────────────────────────────────────────────────────┐
+│                                                                         │
+│ 1. Asegúrate de tener Python 3.10 o superior instalado               │
+│                                                                         │
+│ 2. Abre una terminal/PowerShell en esta carpeta                       │
+│                                                                         │
+│ 3. Instala las dependencias (si es necesario):                        │
+│    pip install -r requirements.txt                                    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ INICIAR EL IDE ──────────────────────────────────────────────────────┐
+│                                                                         │
+│ OPCIÓN 1: Ejecutar el archivo batch (Windows)                         │
+│   Haz doble clic en INICIAR.bat                                       │
+│                                                                         │
+│ OPCIÓN 2: Ejecutar con PowerShell                                     │
+│   .\INICIAR.ps1                                                       │
+│                                                                         │
+│ OPCIÓN 3: Ejecutar directamente con Python                            │
+│   python python_ide_complete.py                                       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ USAR EL IDE ─────────────────────────────────────────────────────────┐
+│                                                                         │
+│ 1. ESCRIBIR CÓDIGO                                                    │
+│    • Escribe código Python en el editor (lado izquierdo)              │
+│    • O selecciona uno de los ejemplos predefinidos                    │
+│                                                                         │
+│ 2. ANALIZAR                                                           │
+│    • Haz clic en el botón "▶ ANALIZAR" (azul claro)                   │
+│    • O presiona Ctrl+Enter (si está implementado)                     │
+│                                                                         │
+│ 3. REVISAR RESULTADOS                                                 │
+│    • Pestañas disponibles:                                            │
+│      - 📋 Análisis Léxico     → Tokens encontrados                    │
+│      - 🌳 Análisis Sintáctico → Árbol AST                             │
+│      - 🔍 Análisis Semántico  → Validación de tipos                   │
+│      - ⚙️ Código TAC          → Código intermedio                     │
+│      - 🚀 Optimización        → Código optimizado                     │
+│      - 💻 Código Máquina      → Ensamblador generado                  │
+│      - ▶️ Ejecución           → Salida del programa                   │
+│      - 📚 Reglas Semánticas   → Reglas de compilación                 │
+│      - 📖 Gramática           → Especificación del lenguaje           │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ EJEMPLOS PREDEFINIDOS ───────────────────────────────────────────────┐
+│                                                                         │
+│ El IDE incluye estos ejemplos:                                        │
+│                                                                         │
+│ • Fibonacci    - Genera la serie de Fibonacci                         │
+│ • Búsqueda     - Busca un elemento en una lista                       │
+│ • Listas       - Procesa y suma elementos de una lista                │
+│ • Con Errores  - Ejemplos con errores para aprender                   │
+│                                                                         │
+│ Para cargar un ejemplo:                                               │
+│   1. Selecciona el radio button del ejemplo                           │
+│   2. El código se cargará automáticamente en el editor                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ CÓDIGO SOPORTADO ────────────────────────────────────────────────────┐
+│                                                                         │
+│ ✓ Variables y asignaciones                                            │
+│ ✓ Números enteros y decimales                                         │
+│ ✓ Strings (cadenas de texto)                                          │
+│ ✓ Listas y arrays                                                     │
+│ ✓ Operaciones aritméticas: +, -, *, /, %                              │
+│ ✓ Operaciones lógicas: ==, !=, <, >, <=, >=                           │
+│ ✓ Condicionales: if, elif, else                                       │
+│ ✓ Bucles: while, for...in                                             │
+│ ✓ Función: print()                                                    │
+│ ✓ Función: len()                                                      │
+│ ✓ Función: range()                                                    │
+│                                                                         │
+│ ✗ No soportado: funciones def, clases, imports, etc.                 │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ EJEMPLO DE USO ──────────────────────────────────────────────────────┐
+│                                                                         │
+│ # Calcula la suma de números                                          │
+│ numeros = [10, 20, 30, 40]                                            │
+│ suma = 0                                                              │
+│                                                                         │
+│ for num in numeros:                                                   │
+│     suma = suma + num                                                 │
+│                                                                         │
+│ print("Suma:")                                                        │
+│ print(suma)                                                           │
+│                                                                         │
+│ Esperado: Suma: 100                                                   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ SOLUCIÓN DE PROBLEMAS ───────────────────────────────────────────────┐
+│                                                                         │
+│ P: "ModuleNotFoundError: No module named..."                          │
+│ R: Verifica que todos los archivos .py están en la misma carpeta      │
+│                                                                         │
+│ P: La ventana del IDE no aparece                                      │
+│ R: Asegúrate de que Tkinter está instalado (incluido en Python)       │
+│                                                                         │
+│ P: Error al analizar código                                           │
+│ R: Revisa la sintaxis del código. Hay errores semánticos o sintácticos│
+│                                                                         │
+│ P: "No se pudo iniciar el IDE"                                        │
+│ R: Verifica que Python 3.10+ esté instalado: python --version         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ ARCHIVOS EN ESTA CARPETA ────────────────────────────────────────────┐
+│                                                                         │
+│ INICIAR.bat                  - Script para iniciar en Windows          │
+│ INICIAR.ps1                  - Script para iniciar en PowerShell       │
+│ README.md                    - Documentación completa                  │
+│ GUIA_RAPIDA.txt              - Este archivo                            │
+│ requirements.txt             - Dependencias de Python                  │
+│                                                                         │
+│ python_ide_complete.py       - Interfaz gráfica principal             │
+│ python_compiler.py           - Compilador                              │
+│ lexer.py                     - Análisis léxico                         │
+│ parser.py                    - Análisis sintáctico                     │
+│ semantic_analyzer.py         - Análisis semántico                      │
+│ ast_nodes.py                 - Definiciones de nodos AST               │
+│ tac_generator.py             - Generador de código TAC                 │
+│ tac_optimizer.py             - Optimizador TAC                         │
+│ tac_interpreter.py           - Intérprete TAC                          │
+│ machine_code_generator.py    - Generador de código máquina             │
+│ token_types.py               - Tipos de tokens                         │
+│ reglas_semanticas.py         - Reglas semánticas                       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+¡Disfruta usando el IDE del Compilador Interactivo de Python!
+
+Para más información, consulta README.md

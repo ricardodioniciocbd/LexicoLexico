@@ -1,0 +1,10 @@
+# MiniLang IDE Requirements
+# No external dependencies required - uses Python standard library only
+
+# Python 3.7+ required
+# tkinter (included with Python on Windows)
+
+# All modules use only Python standard library:
+# - tkinter for GUI
+# - enum for token types
+# - re for regular expressions (if needed in future)

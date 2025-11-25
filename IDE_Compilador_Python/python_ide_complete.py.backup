@@ -306,7 +306,7 @@ class PythonCompilerIDE:
             background=COLORS['bg_light'],
             foreground=COLORS['fg_primary'],
             padding=[18, 10],
-            font=('Segoe UI', 10, 'bold')
+            font=('Segoe UI', 8, 'bold')
         )
         self.style.map(
             'Custom.TNotebook.Tab',
@@ -326,6 +326,7 @@ class PythonCompilerIDE:
         self.create_machine_code_tab()  # Nueva pestaña
         self.create_execution_tab()
         self.create_semantic_rules_tab()  # Nueva pestaña
+        self.create_formal_properties_tab()  # Nueva pestaña
         self.create_grammar_tab()
         
         return output_frame
@@ -483,6 +484,25 @@ class PythonCompilerIDE:
             
             rules_text.insert('1.0', content)
             rules_text.config(state='disabled')
+    
+    def create_formal_properties_tab(self):
+        """Crea la pestaña de Propiedades Formales"""
+        tab = tk.Frame(self.notebook, bg=COLORS['bg_editor'])
+        self.notebook.add(tab, text="📚 Propiedades Formales")
+        
+        formal_properties_text = scrolledtext.ScrolledText(
+            tab,
+            bg=COLORS['bg_editor'],
+            fg=COLORS['fg_primary'],
+            font=tkfont.Font(family='Consolas', size=10),
+            relief=tk.FLAT,
+            padx=15,
+            pady=15,
+            wrap=tk.WORD
+        )
+        formal_properties_text.pack(fill=tk.BOTH, expand=True)
+        formal_properties_text.insert('1.0', self.get_formal_properties_content())
+        formal_properties_text.config(state='disabled')
     
     def create_grammar_tab(self):
         """Crea la pestaña de Gramática"""
@@ -877,6 +897,65 @@ print("Este código tiene errores")
         self.update_line_numbers()
         self.status_bar.config(text="Ejemplo con ERRORES cargado", bg=COLORS['accent_red'], fg='#ffffff')
     
+    def get_formal_properties_content(self):
+        """Retorna el contenido de las propiedades formales"""
+        return r"""PROPEDADES FORMALES DEL COMPILADOR PYTHON
+================================================================================
+
+1. **Lenguaje Formal**:
+   - El compilador acepta un subconjunto de Python.
+   - Define un conjunto de tokens (palabras reservadas, identificadores, números, strings, operadores, delimitadores).
+   - Define una gramática libre de contexto que permite la generación de programas válidos.
+
+2. **Sintaxis**:
+   - Define la estructura jerárquica de los programas (Programa → Sentencias).
+   - Define la estructura de sentencias (Sentencias → Sentencia Sentencias | ε).
+   - Define la estructura de expresiones (Expresión → Comparación).
+   - Define la estructura de comparaciones (Comparación → Aritmética ((== | != | < | > | <= | >=) Aritmética)?).
+   - Define la estructura de aritmética (Aritmética → Término ((+ | -) Término)*).
+   - Define la estructura de términos (Término → Factor ((* | / | %) Factor)*).
+   - Define la estructura de factores (Factor → NUMERO | STRING | IDENTIFICADOR | IDENTIFICADOR [ Expresión ] | ( Expresión ) | - Factor | Llamada_Funcion | Lista).
+
+3. **Semántica Estática**:
+   - Define reglas de tipo (int, float, string, bool, None).
+   - Define reglas de asignación (identificadores deben ser declarados antes de usar).
+   - Define reglas de operadores (operadores aritméticos, relacionales, lógicos).
+   - Define reglas de precedencia y asociatividad.
+
+4. **Generación de Código Intermedio (TAC)**:
+   - Define un conjunto de instrucciones de tres direcciones (TAC).
+   - Define la estructura de cada instrucción (operador, operando1, operando2, resultado).
+   - Define reglas de generación de código para expresiones, asignaciones, llamadas a funciones, bucles, condicionales.
+
+5. **Optimización**:
+   - Define un conjunto de reglas de optimización para el TAC.
+   - Incluye optimizaciones de constantes, eliminación de código muerto, eliminación de variables temporales, reordenamiento de instrucciones.
+
+6. **Generación de Código Máquina**:
+   - Define un conjunto de instrucciones de ensamblador (ensamblador).
+   - Define la estructura de cada instrucción (operador, operandos, dirección de memoria).
+   - Define reglas de generación de código para expresiones, asignaciones, llamadas a funciones, bucles, condicionales.
+
+7. **Ejecución**:
+   - Define un intérprete que ejecuta el código ensamblador.
+   - Define la estructura de la pila para el manejo de variables y llamadas a funciones.
+   - Define la estructura de control de flujo (bucles, condicionales).
+
+8. **Manejo de Errores**:
+   - Define un sistema de detección de errores léxicos, sintácticos y semánticos.
+   - Define un sistema de reporte de errores con información de línea y columna.
+
+9. **Análisis Léxico**:
+   - Divide el código fuente en tokens.
+   - Identifica palabras reservadas, identificadores, números, strings, operadores, delimitadores.
+   - Maneja errores léxicos (caracteres inválidos, tokens inesperados).
+
+10. **Análisis Sintáctico**:
+    - Analiza la secuencia de tokens para construir el AST.
+    - Verifica la sintaxis de la gramática.
+    - Maneja errores sintácticos (faltan puntos y comas, sintaxis incorrecta).
+"""
+
     def get_grammar_content(self):
         """Retorna el contenido de la gramática"""
         return r"""GRAMÁTICA DEL COMPILADOR PYTHON (Subconjunto)
