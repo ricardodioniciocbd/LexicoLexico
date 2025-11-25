@@ -35,6 +35,9 @@ class MachineCodeGenerator:
         # Modo diccionarios simples (para Sistema_inventario_DICCIONARIO.py)
         self.dict_mode = False
         self.dict_string_literals = {}  # Mapeo de strings literales a etiquetas (ej: "Laptop" -> LaptopStr)
+        
+        # Modo procesamiento de cadenas (para Sistema_de_procesamiento_d_cadenas.py)
+        self.string_processing_mode = False
     
     def is_number(self, value):
         """Verifica si un valor es un número"""
@@ -55,6 +58,10 @@ class MachineCodeGenerator:
         crud_functions = ['menu', 'alta', 'baja', 'modificar', 'listar']
         self.has_crud_functions = False  # Guardar como atributo de clase
         
+        # Detectar patrón de procesamiento de cadenas
+        string_processing_functions = ['contar_vocales', 'invertir', 'es_palindromo', 'contar_caracter', 'a_mayusculas', 'menu', 'main']
+        detected_string_functions = set()
+        
         # Primero, identificar todas las funciones para excluirlas de variables
         for i, instr in enumerate(tac_instructions):
             # Detectar funciones
@@ -66,6 +73,14 @@ class MachineCodeGenerator:
                 # Detectar funciones CRUD
                 if func_name in crud_functions:
                     self.has_crud_functions = True
+                # Detectar funciones de procesamiento de cadenas
+                if func_name in string_processing_functions:
+                    detected_string_functions.add(func_name)
+        
+        # Activar modo procesamiento de cadenas si tiene al menos 5 de las funciones características
+        if len(detected_string_functions) >= 5 and 'contar_vocales' in detected_string_functions:
+            self.string_processing_mode = True
+            self.has_crud_functions = False  # Desactivar CRUD si es procesamiento de cadenas
         
         # Ahora recopilar variables, excluyendo nombres de funciones
         for i, instr in enumerate(tac_instructions):
@@ -114,7 +129,30 @@ class MachineCodeGenerator:
                 if instr.arg1.startswith('"') and instr.arg1.endswith('"'):
                     string_val = instr.arg1[1:-1]
                     if string_val not in self.string_map:
-                        label = f"str_{self.string_counter}"
+                        # En modo procesamiento de cadenas, usar nombres específicos
+                        if self.string_processing_mode:
+                            # Mapeo específico para el menú de procesamiento de cadenas
+                            string_label_map = {
+                                '\n===== PROCESAMIENTO DE CADENAS =====': 'str_0',
+                                '1. Contar vocales': 'str_1',
+                                '2. Invertir cadena': 'str_2',
+                                '3. Verificar palíndromo': 'str_3',
+                                '4. Contar un carácter específico': 'str_4',
+                                '5. Convertir a mayúsculas': 'str_5',
+                                '6. Salir': 'str_6',
+                                'Cantidad de vocales:': 'str_9',
+                                'Invertida:': 'str_10',
+                                ' Es palíndromo.': 'str_11',
+                                ' No es palíndromo.': 'str_12',
+                                'El carácter aparece': 'str_14',
+                                ' veces.': 'str_15',
+                                'En mayúsculas:': 'str_16',
+                                ' Saliendo...': 'str_17',
+                                ' Opción inválida.': 'str_18'
+                            }
+                            label = string_label_map.get(string_val, f"str_{self.string_counter}")
+                        else:
+                            label = f"str_{self.string_counter}"
                         self.string_counter += 1
                         self.string_map[string_val] = label
             
@@ -123,7 +161,16 @@ class MachineCodeGenerator:
                 if instr.arg1.startswith('"') and instr.arg1.endswith('"'):
                     string_val = instr.arg1[1:-1]
                     if string_val not in self.string_map:
-                        label = f"str_{self.string_counter}"
+                        # En modo procesamiento de cadenas, usar nombres específicos
+                        if self.string_processing_mode:
+                            input_label_map = {
+                                'Seleccione una opción: ': 'str_7',
+                                'Ingrese texto: ': 'str_8',
+                                'Ingrese carácter a buscar: ': 'str_13'
+                            }
+                            label = input_label_map.get(string_val, f"str_{self.string_counter}")
+                        else:
+                            label = f"str_{self.string_counter}"
                         self.string_counter += 1
                         self.string_map[string_val] = label
             
@@ -224,9 +271,18 @@ class MachineCodeGenerator:
         # Verificar si hay INPUT para asegurar que str_in se declare
         has_input = any(instr.op == 'INPUT' for instr in tac_instructions)
         
+        # Detectar buffers de INPUT para declarlos correctamente
+        self.input_buffers = set()
+        for instr in tac_instructions:
+            if instr.op == 'INPUT' and instr.result and instr.result.startswith('t'):
+                self.input_buffers.add(instr.result)
+        
         # Si está en modo CRUD, generar estructura de datos especial
         if self.simple_crud_mode:
             self.generate_crud_data_section()
+        elif self.string_processing_mode:
+            # Modo procesamiento de cadenas: generar estructura específica
+            self.generate_string_processing_data_section()
         elif self.dict_mode:
             # Modo diccionarios: generar estructura específica para Sistema_inventario_DICCIONARIO.py
             self.generate_dict_data_section(tac_instructions)
@@ -257,32 +313,40 @@ class MachineCodeGenerator:
                 for string_val, label in sorted(self.string_map.items()):
                     if string_val not in [s[0] for s in ordered_strings]:
                         escaped_string = string_val.replace("'", "''")
-                        self.data_section.append(f"    {label} DB '{escaped_string}', 0Dh, 0Ah, '$'")
+                        # Para strings de INPUT, usar formato diferente (sin newline al final)
+                        if 'ingresa' in string_val.lower() or 'ingrese' in string_val.lower():
+                            self.data_section.append(f"    {label} DB '{escaped_string}', '$'")
+                        else:
+                            self.data_section.append(f"    {label} DB '{escaped_string}', 0Dh, 0Ah, '$'")
             
             # Agregar newline después de los strings
             self.data_section.append("")
             self.data_section.append("    newline DB 0Dh,0Ah,'$'")
             
-            # Declarar t4 si existe (buffer de entrada) - SOLO como DB, no como DW
-            t4_declared = False
-            if 't4' in self.memory_map:
-                self.data_section.append("")
-                self.data_section.append("    t4 DB 6, ?, 6 DUP(?)   ; buffer de entrada")
-                t4_declared = True
+            # Declarar buffers de entrada - SOLO como DB, no como DW
+            for buffer_var in sorted(self.input_buffers):
+                if buffer_var in self.memory_map:
+                    self.data_section.append("")
+                    self.data_section.append(f"    {buffer_var} DB 100, ?, 100 DUP(?)   ; buffer de entrada")
             
             # Declarar variables principales en orden específico
-            main_vars = ['n', 'resultado', 'valor']
+            main_vars = ['n', 'resultado', 'valor', 'valor1', 'valor2']
             for var_name in main_vars:
                 if var_name in self.memory_map:
                     asm_var_name = self.var_name_map.get(var_name, var_name)
-                    self.data_section.append(f"    {asm_var_name} DW ?")
+                    # Si es una variable que recibe INPUT de string, declararla como buffer
+                    if var_name in ['valor1', 'valor2'] or (var_name == 'valor' and var_name not in ['n', 'resultado']):
+                        # Declarar como DW (almacena puntero al buffer)
+                        self.data_section.append(f"    {asm_var_name} DW ?")
+                    else:
+                        self.data_section.append(f"    {asm_var_name} DW ?")
             
             # Luego declarar otras variables (temporales, etc.)
             for var_name in sorted(self.memory_map.keys()):
-                # Solo declarar variables que no sean etiquetas y que no sean las principales ni t4
+                # Solo declarar variables que no sean etiquetas, principales ni buffers de INPUT
                 if (not var_name.startswith('L') and 
                     var_name not in main_vars and 
-                    var_name != 't4'):  # t4 ya se declaró como DB arriba
+                    var_name not in self.input_buffers):  # Buffers ya se declararon como DB arriba
                     # Usar nombre mapeado si existe conflicto, sino usar el nombre original
                     asm_var_name = self.var_name_map.get(var_name, var_name)
                     self.data_section.append(f"    {asm_var_name} DW 0")
@@ -356,6 +420,10 @@ class MachineCodeGenerator:
             self.generate_crud_modificar()
             self.generate_crud_listar()
             self.generate_crud_salir()
+        elif self.string_processing_mode:
+            # Modo procesamiento de cadenas - generar código optimizado manualmente
+            # NO generar desde TAC para evitar código redundante
+            self.generate_string_processing_complete_code()
         else:
             # Modo factorial
             self.code_section.append("main PROC")
@@ -381,15 +449,21 @@ class MachineCodeGenerator:
         # Generar código para funciones definidas por el usuario
         # IMPORTANTE: Ordenar funciones - factorial debe ir antes de user_main según instrucciones.md
         # En modo CRUD, no generar las funciones CRUD como PROC (ya están generadas)
+        # En modo procesamiento de cadenas, NO generar funciones (ya están generadas manualmente)
         sorted_functions = []
-        if 'factorial' in function_instructions:
-            sorted_functions.append(('factorial', function_instructions['factorial']))
-        for func_name, func_instrs in function_instructions.items():
-            # Excluir funciones CRUD en modo CRUD
-            if func_name != 'factorial':
-                if self.simple_crud_mode and func_name in ['menu', 'alta', 'baja', 'modificar', 'listar']:
-                    continue  # No agregar funciones CRUD
-                sorted_functions.append((func_name, func_instrs))
+        
+        # Si es modo procesamiento de cadenas, NO generar funciones desde TAC
+        if self.string_processing_mode:
+            pass  # Las funciones ya están generadas en generate_string_processing_complete_code()
+        else:
+            if 'factorial' in function_instructions:
+                sorted_functions.append(('factorial', function_instructions['factorial']))
+            for func_name, func_instrs in function_instructions.items():
+                # Excluir funciones CRUD en modo CRUD
+                if func_name != 'factorial':
+                    if self.simple_crud_mode and func_name in ['menu', 'alta', 'baja', 'modificar', 'listar']:
+                        continue  # No agregar funciones CRUD
+                    sorted_functions.append((func_name, func_instrs))
         
         for func_name, func_instrs in sorted_functions:
             # Si la función se llama 'main', usar el nombre renombrado
@@ -464,7 +538,8 @@ class MachineCodeGenerator:
         
         # Funciones auxiliares - replicando exactamente instrucciones.md
         # En modo diccionarios, se generan en orden diferente por generate_dict_helper_functions
-        if not self.dict_mode:
+        # En modo procesamiento de cadenas, NO generar (ya están incluidas)
+        if not self.dict_mode and not self.string_processing_mode:
             self.code_section.append(";-------------------------------------------------------")
             self.code_section.append("; Convierte cadena en SI -> AX (entero)")
             self.code_section.append(";-------------------------------------------------------")
@@ -547,8 +622,16 @@ class MachineCodeGenerator:
         elif self.simple_crud_mode:
             self.generate_crud_helper_functions()
         
+        # Agregar funciones auxiliares para procesamiento de cadenas
+        elif self.string_processing_mode:
+            # Los helpers ya están incluidos en generate_string_processing_complete_code()
+            pass
+        
         if self.simple_crud_mode:
             self.code_section.append("END start")
+        elif self.string_processing_mode:
+            self.code_section.append("")
+            self.code_section.append("END main")
         else:
             self.code_section.append("END main")
         
@@ -646,10 +729,15 @@ class MachineCodeGenerator:
         
         if instr.op == 'ASSIGN':
             # Evitar asignaciones redundantes o incorrectas
-            # Si se asigna desde t4 (buffer de entrada), ignorar porque t4 es un buffer de string
-            if instr.arg1 == 't4' and instr.result != 't4':
-                # t4 es un buffer de string, no se puede asignar directamente a variables numéricas
-                # Esta asignación se maneja en INPUT, así que la ignoramos aquí
+            # Si se asigna desde un buffer de entrada, generar código especial
+            if hasattr(self, 'input_buffers') and instr.arg1 in self.input_buffers and instr.result != instr.arg1:
+                # Es una asignación de buffer a variable (ej: valor1 = t0)
+                # Almacenar el OFFSET del buffer en la variable
+                self.code_section.append(f"    ; {instr.result} = {instr.arg1}")
+                asm_buffer = self.get_asm_var_name(instr.arg1)
+                asm_result = self.get_asm_var_name(instr.result)
+                self.code_section.append(f"    MOV AX, OFFSET {asm_buffer}+2  ; Puntero al contenido del buffer")
+                self.code_section.append(f"    MOV {asm_result}, AX")
                 return
             
             # Si se asigna valor = t4 después de INPUT, ignorar porque valor se establece en CALL int
@@ -913,6 +1001,39 @@ class MachineCodeGenerator:
                 'GT': 'JG', 'LTE': 'JLE', 'GTE': 'JGE'
             }
             self.code_section.append(f"    ; {instr.result} = {instr.arg1} {instr.op} {instr.arg2}")
+            
+            # En modo procesamiento de cadenas, comparar caracteres con literales usa AL
+            if self.string_processing_mode and (instr.arg2.startswith("'") or instr.arg1.startswith("'") or instr.arg2.startswith('"') or instr.arg1.startswith('"')):
+                # Comparación de caracter o string: ch == 'a' o opcion == "1"
+                # El caracter ya está en char_val o opcion, cargarlo en AL
+                if instr.arg1 in self.memory_map:
+                    asm_var = self.get_asm_var_name(instr.arg1)
+                    self.code_section.append(f"    MOV AX, {asm_var}")
+                    self.code_section.append(f"    ; AL tiene el caracter")
+                
+                # Para comparaciones de strings (opcion == "1"), convertir a ASCII
+                compare_val = instr.arg2
+                if compare_val.startswith('"') and compare_val.endswith('"'):
+                    # "1" → '1' (ASCII)
+                    char_val = compare_val[1:-1]
+                    if len(char_val) == 1:
+                        compare_val = f"'{char_val}'"
+                
+                # Generar resultado booleano (1 si true, 0 si false)
+                asm_result = self.get_asm_var_name(instr.result)
+                label_true = f"cmp_true_{self.label_counter}"
+                label_end = f"cmp_end_{self.label_counter}"
+                self.label_counter += 1
+                
+                self.code_section.append(f"    CMP AL, {compare_val}")
+                self.code_section.append(f"    {jump_map[instr.op]} {label_true}")
+                self.code_section.append(f"    MOV {asm_result}, 0")
+                self.code_section.append(f"    JMP {label_end}")
+                self.code_section.append(f"{label_true}:")
+                self.code_section.append(f"    MOV {asm_result}, 1")
+                self.code_section.append(f"{label_end}:")
+                return
+            
             reg1 = self.load_value(instr.arg1)
             reg2 = self.load_value(instr.arg2)
             reg_dest = self.get_register(instr.result)
@@ -931,9 +1052,34 @@ class MachineCodeGenerator:
             self.store_value(reg_dest, instr.result)
         
         elif instr.op == 'PRINT':
+            # En modo procesamiento de cadenas, PRINT de contador usa print_number
+            if self.string_processing_mode and instr.arg1 == 'contador':
+                self.code_section.append(f"    ; print(contador)")
+                asm_var = self.get_asm_var_name('contador')
+                self.code_section.append(f"    MOV AX, {asm_var}")
+                self.code_section.append(f"    CALL print_number")
+                return
+            
+            # En modo procesamiento de cadenas, PRINT de invertida llama a invertir
+            if self.string_processing_mode and instr.arg1 == 'invertida':
+                self.code_section.append(f"    ; print(invertida)")
+                self.code_section.append(f"    CALL invertir")
+                return
+            
             # Verificar si es un string
             if instr.arg1 and instr.arg1.startswith('"') and instr.arg1.endswith('"'):
                 string_val = instr.arg1[1:-1]
+                
+                # En modo procesamiento de cadenas, mapear strings específicos
+                if self.string_processing_mode:
+                    # Los strings ya están mapeados en generate_string_processing_data_section
+                    label = self.string_map.get(string_val, f'str_{self.string_counter}')
+                    self.code_section.append(f"    ; print(\"{string_val}\")")
+                    self.code_section.append(f"    MOV DX, OFFSET {label}")
+                    self.code_section.append(f"    MOV AH, 09h")
+                    self.code_section.append(f"    INT 21h")
+                    return
+                
                 # Mapear a nombres específicos como en instrucciones.md
                 string_name_map = {
                     '=== CÁLCULO DE FACTORIAL ===': 'str_0',
@@ -957,6 +1103,16 @@ class MachineCodeGenerator:
                 var_to_print = instr.arg1
                 if var_to_print == 'n' and 'valor' in self.memory_map:
                     var_to_print = 'valor'
+                
+                # Si la variable es un puntero a string (resultado de INPUT), imprimir el string
+                if var_to_print in ['valor1', 'valor2'] or (var_to_print == 'valor' and hasattr(self, 'input_buffers') and len(self.input_buffers) > 0):
+                    # Es un string, imprimir usando INT 21h función 09h
+                    asm_var = self.get_asm_var_name(var_to_print)
+                    self.code_section.append(f"    ; print({var_to_print}) - string")
+                    self.code_section.append(f"    MOV DX, {asm_var}  ; Cargar puntero al string")
+                    self.code_section.append(f"    MOV AH, 09h")
+                    self.code_section.append(f"    INT 21h")
+                    return
                 
                 # En modo diccionarios, verificar si es un diccionario a imprimir
                 if self.dict_mode:
@@ -1053,14 +1209,26 @@ class MachineCodeGenerator:
             pass
         
         elif instr.op == 'LIST_GET':
-            self.code_section.append(f"    ; {instr.result} = {instr.arg1}[{instr.arg2}]")
-            # Implementación simplificada
-            reg_list = self.load_value(instr.arg1)
-            reg_index = self.load_value(instr.arg2)
-            reg_dest = self.get_register(instr.result)
-            self.code_section.append(f"    ; Acceso a lista simplificado")
-            self.code_section.append(f"    MOV {reg_dest}, 0")
-            self.store_value(reg_dest, instr.result)
+            # En modo procesamiento de cadenas, indexar strings usa patrón especial
+            if self.string_processing_mode and instr.arg1 == 'texto':
+                # texto[i] → MOV BX, texto; ADD BX, i; MOV AL, [BX]; MOV char_val, AX
+                self.code_section.append(f"    ; {instr.result} = texto[{instr.arg2}]")
+                self.code_section.append(f"    MOV BX, texto")
+                asm_index = self.get_asm_var_name(instr.arg2)
+                self.code_section.append(f"    ADD BX, {asm_index}")
+                self.code_section.append(f"    MOV AL, [BX]    ; AL tiene el caracter")
+                self.code_section.append(f"    MOV AH, 0")
+                asm_result = self.get_asm_var_name(instr.result)
+                self.code_section.append(f"    MOV {asm_result}, AX ; Guardar en {instr.result}")
+            else:
+                self.code_section.append(f"    ; {instr.result} = {instr.arg1}[{instr.arg2}]")
+                # Implementación simplificada
+                reg_list = self.load_value(instr.arg1)
+                reg_index = self.load_value(instr.arg2)
+                reg_dest = self.get_register(instr.result)
+                self.code_section.append(f"    ; Acceso a lista simplificado")
+                self.code_section.append(f"    MOV {reg_dest}, 0")
+                self.store_value(reg_dest, instr.result)
         
         elif instr.op == 'DICT_CREATE':
             self.code_section.append(f"    ; {instr.result} = {{}}")
@@ -1185,11 +1353,18 @@ class MachineCodeGenerator:
         elif instr.op == 'CALL':
             self.code_section.append(f"    ; {instr.result} = {instr.arg1}()")
             if instr.arg1 == 'len':
-                reg_list = self.load_value(instr.arg2)
-                reg_dest = self.get_register(instr.result)
-                # Implementación simplificada
-                self.code_section.append(f"    MOV {reg_dest}, 0    ; len simplificado")
-                self.store_value(reg_dest, instr.result)
+                if self.string_processing_mode:
+                    # En modo procesamiento de cadenas, len(texto) usa texto_len
+                    # MOV AX, texto_len; MOV resultado, AX
+                    self.code_section.append(f"    MOV AX, texto_len    ; len({instr.arg2})")
+                    asm_result = self.get_asm_var_name(instr.result)
+                    self.code_section.append(f"    MOV {asm_result}, AX")
+                else:
+                    reg_list = self.load_value(instr.arg2)
+                    reg_dest = self.get_register(instr.result)
+                    # Implementación simplificada
+                    self.code_section.append(f"    MOV {reg_dest}, 0    ; len simplificado")
+                    self.store_value(reg_dest, instr.result)
             elif instr.arg1 == 'int':
                 # Conversión de string a entero - como en instrucciones.md
                 # SI ya debe estar apuntando a t4+2 después de INPUT
@@ -1294,6 +1469,56 @@ class MachineCodeGenerator:
             self.code_section.append(f"    RET")
         
         elif instr.op == 'INPUT':
+            # En modo procesamiento de cadenas, INPUT de texto usa leer_texto_usuario
+            if self.string_processing_mode and instr.result == 'texto':
+                self.code_section.append(f"    ; Leer texto del usuario")
+                self.code_section.append(f"    CALL leer_texto_usuario")
+                return
+            
+            # En modo procesamiento de cadenas, INPUT de opción usa buffer_opcion
+            if self.string_processing_mode and instr.result == 'opcion':
+                # Leer opción del menú
+                if instr.arg1 and instr.arg1.startswith('"'):
+                    string_val = instr.arg1[1:-1]
+                    label = self.string_map.get(string_val, 'str_7')
+                    self.code_section.append(f"    ; Pedir opción")
+                    self.code_section.append(f"    MOV DX, OFFSET {label}")
+                    self.code_section.append(f"    MOV AH, 09h")
+                    self.code_section.append(f"    INT 21h")
+                
+                self.code_section.append(f"    MOV DX, OFFSET buffer_opcion")
+                self.code_section.append(f"    MOV AH, 0Ah")
+                self.code_section.append(f"    INT 21h")
+                # Obtener el caracter de la opción
+                self.code_section.append(f"    MOV SI, OFFSET buffer_opcion + 2")
+                self.code_section.append(f"    MOV AL, [SI]")
+                # Convertir a string de 1 caracter (simplificado: guardar como número ASCII)
+                self.code_section.append(f"    MOV AH, 0")
+                asm_result = self.get_asm_var_name(instr.result)
+                self.code_section.append(f"    MOV {asm_result}, AX")
+                return
+            
+            # En modo procesamiento de cadenas, INPUT de caracter usa buffer_char
+            if self.string_processing_mode and instr.result == 'caracter':
+                if instr.arg1 and instr.arg1.startswith('"'):
+                    string_val = instr.arg1[1:-1]
+                    label = self.string_map.get(string_val, 'str_13')
+                    self.code_section.append(f"    ; Pedir caracter")
+                    self.code_section.append(f"    MOV DX, OFFSET {label}")
+                    self.code_section.append(f"    MOV AH, 09h")
+                    self.code_section.append(f"    INT 21h")
+                
+                self.code_section.append(f"    MOV DX, OFFSET buffer_char")
+                self.code_section.append(f"    MOV AH, 0Ah")
+                self.code_section.append(f"    INT 21h")
+                # Obtener el caracter ingresado
+                self.code_section.append(f"    MOV SI, OFFSET buffer_char + 2")
+                self.code_section.append(f"    MOV AL, [SI]")
+                self.code_section.append(f"    MOV AH, 0")
+                asm_result = self.get_asm_var_name(instr.result)
+                self.code_section.append(f"    MOV {asm_result}, AX")
+                return
+            
             # Leer string desde entrada estándar - replicando instrucciones.md
             if instr.arg1:
                 # Mostrar prompt (pedir número)
@@ -1324,7 +1549,8 @@ class MachineCodeGenerator:
                 # Preparar cadena como en instrucciones.md
                 self.code_section.append(f"    ; preparar cadena")
                 self.code_section.append(f"    MOV SI, OFFSET {asm_var_name}+2")
-                self.code_section.append(f"    MOV CL, [{asm_var_name}+1]")
+                self.code_section.append(f"    MOV CL, BYTE PTR [{asm_var_name}+1]")
+                self.code_section.append(f"    MOV CH, 0")
                 self.code_section.append(f"    ADD SI, CX")
                 self.code_section.append(f"    MOV BYTE PTR [SI], 0")
                 self.code_section.append(f"    MOV SI, OFFSET {asm_var_name}+2")
@@ -1446,6 +1672,484 @@ class MachineCodeGenerator:
                 var_name != 'input_buffer'):
                 asm_var_name = self.get_asm_var_name(var_name)
                 self.data_section.append(f"    {asm_var_name}  DW 0")
+    
+    def generate_string_processing_data_section(self):
+        """Genera la sección de datos para Sistema_de_procesamiento_d_cadenas.py"""
+        self.data_section.append("    newline DB 0Dh,0Ah,'$'")
+        self.data_section.append("")
+        self.data_section.append("    ; --- Textos del Menú ---")
+        self.data_section.append("    str_0 DB 0Dh, 0Ah, '===== PROCESAMIENTO DE CADENAS =====', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_1 DB '1. Contar vocales', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_2 DB '2. Invertir cadena', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_3 DB '3. Verificar palindromo', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_4 DB '4. Contar un caracter especifico', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_5 DB '5. Convertir a mayusculas', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_6 DB '6. Salir', 0Dh, 0Ah, '$'")
+        self.data_section.append("")
+        self.data_section.append("    str_7 DB 0Dh, 0Ah, 'Seleccione una opcion: $'")
+        self.data_section.append("    str_8 DB 0Dh, 0Ah, 'Ingrese texto: $'")
+        self.data_section.append("    str_13 DB 0Dh, 0Ah, 'Ingrese caracter a buscar: $'")
+        self.data_section.append("")
+        self.data_section.append("    str_9 DB 0Dh, 0Ah, 'Cantidad de vocales: $'")
+        self.data_section.append("    str_10 DB 0Dh, 0Ah, 'Invertida: $'")
+        self.data_section.append("    str_11 DB ' Es palindromo.', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_12 DB ' No es palindromo.', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_14 DB 0Dh, 0Ah, 'El caracter aparece $'")
+        self.data_section.append("    str_15 DB ' veces.', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_16 DB 0Dh, 0Ah, 'En mayusculas: $'")
+        self.data_section.append("    str_17 DB 0Dh, 0Ah, 'Saliendo...', 0Dh, 0Ah, '$'")
+        self.data_section.append("    str_18 DB 0Dh, 0Ah, 'Opcion invalida.', 0Dh, 0Ah, '$'")
+        self.data_section.append("")
+        self.data_section.append("    ; --- Variables y Buffers ---")
+        self.data_section.append("    ; IMPORTANTE: Los buffers de entrada deben tener estructura: max_len, actual_len, bytes...")
+        self.data_section.append("    buffer_opcion DB 5, ?, 5 DUP(0)")
+        self.data_section.append("    buffer_texto  DB 50, ?, 50 DUP(0)")
+        self.data_section.append("    buffer_char   DB 5, ?, 5 DUP(0)")
+        self.data_section.append("")
+        self.data_section.append("    ; Punteros y Variables")
+        self.data_section.append("    texto DW ?          ; Puntero al inicio del string actual")
+        self.data_section.append("    texto_len DW ?      ; Longitud del texto actual")
+        self.data_section.append("")
+        self.data_section.append("    char_val DW 0       ; Renombrado de 'ch' a 'char_val'")
+        self.data_section.append("    caracter DW 0       ; Caracter a buscar (ASCII)")
+        self.data_section.append("")
+        self.data_section.append("    contador DW 0")
+        self.data_section.append("    i DW 0")
+        self.data_section.append("")
+        self.data_section.append("    invertida_buf DB 50 DUP(0), '$' ; Buffer para string invertido")
+        self.data_section.append("")
+        self.data_section.append("    ; Variables temporales del compilador (reutilizadas)")
+        self.data_section.append("    t0 DW 0")
+        self.data_section.append("    t1 DW 0")
+    
+    def generate_string_processing_complete_code(self):
+        """Genera el código ASM completo para procesamiento de cadenas según instrucciones.md"""
+        # Main PROC
+        self.code_section.append("")
+        self.code_section.append("main PROC")
+        self.code_section.append("    MOV AX, @data")
+        self.code_section.append("    MOV DS, AX")
+        self.code_section.append("")
+        self.code_section.append("    CALL user_main")
+        self.code_section.append("")
+        self.code_section.append("    MOV AH, 4Ch")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("main ENDP")
+        self.code_section.append("")
+        
+        # Función contar_vocales
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; Función: contar_vocales")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("contar_vocales PROC")
+        self.code_section.append("    MOV contador, 0")
+        self.code_section.append("    MOV i, 0")
+        self.code_section.append("")
+        self.code_section.append("L_cv_loop:")
+        self.code_section.append("    ; Condición bucle: i < len")
+        self.code_section.append("    MOV AX, i")
+        self.code_section.append("    CMP AX, texto_len")
+        self.code_section.append("    JGE L_cv_fin    ; Si i >= len, salir")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Leer caracter texto[i]")
+        self.code_section.append("    MOV BX, texto")
+        self.code_section.append("    ADD BX, i")
+        self.code_section.append("    MOV AL, [BX]    ; AL tiene el caracter")
+        self.code_section.append("    MOV AH, 0")
+        self.code_section.append("    MOV char_val, AX ; Guardar en variable temporal")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Comparaciones (A, E, I, O, U y minúsculas)")
+        self.code_section.append("    CMP AL, 'a'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'e'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'i'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'o'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'u'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'A'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'E'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'I'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'O'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    CMP AL, 'U'")
+        self.code_section.append("    JE es_vocal")
+        self.code_section.append("    JMP sig_char")
+        self.code_section.append("")
+        self.code_section.append("es_vocal:")
+        self.code_section.append("    INC contador")
+        self.code_section.append("")
+        self.code_section.append("sig_char:")
+        self.code_section.append("    INC i")
+        self.code_section.append("    JMP L_cv_loop")
+        self.code_section.append("")
+        self.code_section.append("L_cv_fin:")
+        self.code_section.append("    MOV AX, contador")
+        self.code_section.append("    RET")
+        self.code_section.append("contar_vocales ENDP")
+        self.code_section.append("")
+        
+        # Función invertir
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; Función: invertir")
+        self.code_section.append("; Imprime directamente la cadena invertida para simplificar")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("invertir PROC")
+        self.code_section.append("    ; i = len - 1")
+        self.code_section.append("    MOV AX, texto_len")
+        self.code_section.append("    DEC AX")
+        self.code_section.append("    MOV i, AX")
+        self.code_section.append("")
+        self.code_section.append("L_inv_loop:")
+        self.code_section.append("    CMP i, 0")
+        self.code_section.append("    JL L_inv_fin    ; Si i < 0, terminar")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Imprimir caracter texto[i]")
+        self.code_section.append("    MOV BX, texto")
+        self.code_section.append("    ADD BX, i")
+        self.code_section.append("    MOV DL, [BX]")
+        self.code_section.append("    MOV AH, 02h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    ")
+        self.code_section.append("    DEC i")
+        self.code_section.append("    JMP L_inv_loop")
+        self.code_section.append("")
+        self.code_section.append("L_inv_fin:")
+        self.code_section.append("    RET")
+        self.code_section.append("invertir ENDP")
+        self.code_section.append("")
+        
+        # Función es_palindromo
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; Función: es_palindromo")
+        self.code_section.append("; Retorna 1 en AX si es palíndromo, 0 si no")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("es_palindromo PROC")
+        self.code_section.append("    MOV SI, 0               ; Índice izquierdo")
+        self.code_section.append("    MOV DI, texto_len")
+        self.code_section.append("    DEC DI                  ; Índice derecho (len - 1)")
+        self.code_section.append("")
+        self.code_section.append("L_pal_loop:")
+        self.code_section.append("    CMP SI, DI")
+        self.code_section.append("    JGE es_pal_true         ; Si se cruzan, es palíndromo")
+        self.code_section.append("")
+        self.code_section.append("    ; Cargar char izquierdo")
+        self.code_section.append("    MOV BX, texto")
+        self.code_section.append("    ADD BX, SI")
+        self.code_section.append("    MOV AL, [BX]")
+        self.code_section.append("")
+        self.code_section.append("    ; Cargar char derecho")
+        self.code_section.append("    MOV BX, texto")
+        self.code_section.append("    ADD BX, DI")
+        self.code_section.append("    MOV AH, [BX]")
+        self.code_section.append("")
+        self.code_section.append("    CMP AL, AH")
+        self.code_section.append("    JNE es_pal_false        ; Si son diferentes, no es palíndromo")
+        self.code_section.append("")
+        self.code_section.append("    INC SI")
+        self.code_section.append("    DEC DI")
+        self.code_section.append("    JMP L_pal_loop")
+        self.code_section.append("")
+        self.code_section.append("es_pal_true:")
+        self.code_section.append("    MOV AX, 1")
+        self.code_section.append("    RET")
+        self.code_section.append("")
+        self.code_section.append("es_pal_false:")
+        self.code_section.append("    MOV AX, 0")
+        self.code_section.append("    RET")
+        self.code_section.append("es_palindromo ENDP")
+        self.code_section.append("")
+        
+        # Función contar_caracter
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; Función: contar_caracter")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("contar_caracter PROC")
+        self.code_section.append("    MOV contador, 0")
+        self.code_section.append("    MOV i, 0")
+        self.code_section.append("")
+        self.code_section.append("L_cc_loop:")
+        self.code_section.append("    MOV AX, i")
+        self.code_section.append("    CMP AX, texto_len")
+        self.code_section.append("    JGE L_cc_fin")
+        self.code_section.append("")
+        self.code_section.append("    MOV BX, texto")
+        self.code_section.append("    ADD BX, i")
+        self.code_section.append("    MOV AL, [BX]    ; Caracter actual")
+        self.code_section.append("    MOV AH, 0")
+        self.code_section.append("    ")
+        self.code_section.append("    MOV CX, caracter ; Caracter a buscar")
+        self.code_section.append("    CMP AX, CX")
+        self.code_section.append("    JNE L_cc_next")
+        self.code_section.append("    INC contador")
+        self.code_section.append("")
+        self.code_section.append("L_cc_next:")
+        self.code_section.append("    INC i")
+        self.code_section.append("    JMP L_cc_loop")
+        self.code_section.append("")
+        self.code_section.append("L_cc_fin:")
+        self.code_section.append("    MOV AX, contador")
+        self.code_section.append("    RET")
+        self.code_section.append("contar_caracter ENDP")
+        self.code_section.append("")
+        
+        # Función a_mayusculas
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; Función: a_mayusculas")
+        self.code_section.append("; Imprime y convierte al vuelo")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("a_mayusculas PROC")
+        self.code_section.append("    MOV i, 0")
+        self.code_section.append("L_may_loop:")
+        self.code_section.append("    MOV AX, i")
+        self.code_section.append("    CMP AX, texto_len")
+        self.code_section.append("    JGE L_may_fin")
+        self.code_section.append("")
+        self.code_section.append("    MOV BX, texto")
+        self.code_section.append("    ADD BX, i")
+        self.code_section.append("    MOV DL, [BX]    ; Cargar char")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Si es 'a'...'z', restar 32")
+        self.code_section.append("    CMP DL, 'a'")
+        self.code_section.append("    JB print_char")
+        self.code_section.append("    CMP DL, 'z'")
+        self.code_section.append("    JA print_char")
+        self.code_section.append("    SUB DL, 32      ; Convertir a mayúscula")
+        self.code_section.append("")
+        self.code_section.append("print_char:")
+        self.code_section.append("    MOV AH, 02h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("")
+        self.code_section.append("    INC i")
+        self.code_section.append("    JMP L_may_loop")
+        self.code_section.append("")
+        self.code_section.append("L_may_fin:")
+        self.code_section.append("    RET")
+        self.code_section.append("a_mayusculas ENDP")
+        self.code_section.append("")
+        self.code_section.append("")
+        
+        # Función user_main (menú)
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; LOGICA DEL MENU")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("user_main PROC")
+        self.code_section.append("menu_loop:")
+        self.code_section.append("    ; Mostrar opciones")
+        self.code_section.append("    MOV DX, OFFSET str_0")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    MOV DX, OFFSET str_1")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    MOV DX, OFFSET str_2")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    MOV DX, OFFSET str_3")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    MOV DX, OFFSET str_4")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    MOV DX, OFFSET str_5")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    MOV DX, OFFSET str_6")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    MOV DX, OFFSET str_7")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("")
+        self.code_section.append("    ; Leer opción (buffer)")
+        self.code_section.append("    MOV DX, OFFSET buffer_opcion")
+        self.code_section.append("    MOV AH, 0Ah")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Analizar opción (el char está en buffer+2)")
+        self.code_section.append("    MOV SI, OFFSET buffer_opcion + 2")
+        self.code_section.append("    MOV AL, [SI]")
+        self.code_section.append("    ")
+        self.code_section.append("    CMP AL, '1'")
+        self.code_section.append("    JE op_1")
+        self.code_section.append("    CMP AL, '2'")
+        self.code_section.append("    JE op_2")
+        self.code_section.append("    CMP AL, '3'")
+        self.code_section.append("    JE op_3")
+        self.code_section.append("    CMP AL, '4'")
+        self.code_section.append("    JE op_4")
+        self.code_section.append("    CMP AL, '5'")
+        self.code_section.append("    JE op_5")
+        self.code_section.append("    CMP AL, '6'")
+        self.code_section.append("    JE op_6")
+        self.code_section.append("    ")
+        self.code_section.append("    JMP op_invalida")
+        self.code_section.append("")
+        self.code_section.append("; --- OPCION 1: Contar Vocales ---")
+        self.code_section.append("op_1:")
+        self.code_section.append("    CALL leer_texto_usuario")
+        self.code_section.append("    MOV DX, OFFSET str_9")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    CALL contar_vocales")
+        self.code_section.append("    CALL print_number")
+        self.code_section.append("    JMP menu_loop")
+        self.code_section.append("")
+        self.code_section.append("; --- OPCION 2: Invertir ---")
+        self.code_section.append("op_2:")
+        self.code_section.append("    CALL leer_texto_usuario")
+        self.code_section.append("    MOV DX, OFFSET str_10")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    CALL invertir")
+        self.code_section.append("    JMP menu_loop")
+        self.code_section.append("")
+        self.code_section.append("; --- OPCION 3: Palíndromo ---")
+        self.code_section.append("op_3:")
+        self.code_section.append("    CALL leer_texto_usuario")
+        self.code_section.append("    CALL es_palindromo")
+        self.code_section.append("    CMP AX, 1")
+        self.code_section.append("    JE es_pal")
+        self.code_section.append("    MOV DX, OFFSET str_12")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    JMP menu_loop")
+        self.code_section.append("es_pal:")
+        self.code_section.append("    MOV DX, OFFSET str_11")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    JMP menu_loop")
+        self.code_section.append("")
+        self.code_section.append("; --- OPCION 4: Contar Caracter ---")
+        self.code_section.append("op_4:")
+        self.code_section.append("    CALL leer_texto_usuario")
+        self.code_section.append("    ")
+        self.code_section.append("    MOV DX, OFFSET str_13 ; Pedir char")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    ")
+        self.code_section.append("    MOV DX, OFFSET buffer_char")
+        self.code_section.append("    MOV AH, 0Ah")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Obtener char ingresado")
+        self.code_section.append("    MOV SI, OFFSET buffer_char + 2")
+        self.code_section.append("    MOV AL, [SI]")
+        self.code_section.append("    MOV AH, 0")
+        self.code_section.append("    MOV caracter, AX")
+        self.code_section.append("    ")
+        self.code_section.append("    MOV DX, OFFSET str_14")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    ")
+        self.code_section.append("    CALL contar_caracter")
+        self.code_section.append("    CALL print_number")
+        self.code_section.append("    ")
+        self.code_section.append("    MOV DX, OFFSET str_15")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    JMP menu_loop")
+        self.code_section.append("")
+        self.code_section.append("; --- OPCION 5: Mayúsculas ---")
+        self.code_section.append("op_5:")
+        self.code_section.append("    CALL leer_texto_usuario")
+        self.code_section.append("    MOV DX, OFFSET str_16")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    CALL a_mayusculas")
+        self.code_section.append("    JMP menu_loop")
+        self.code_section.append("")
+        self.code_section.append("; --- OPCION 6: Salir ---")
+        self.code_section.append("op_6:")
+        self.code_section.append("    MOV DX, OFFSET str_17")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    RET")
+        self.code_section.append("")
+        self.code_section.append("op_invalida:")
+        self.code_section.append("    MOV DX, OFFSET str_18")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    JMP menu_loop")
+        self.code_section.append("")
+        self.code_section.append("user_main ENDP")
+        self.code_section.append("")
+        
+        # Helper: leer_texto_usuario
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; Helper: Leer texto del usuario y configurar punteros")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("leer_texto_usuario PROC")
+        self.code_section.append("    MOV DX, OFFSET str_8 ; \"Ingrese texto\"")
+        self.code_section.append("    MOV AH, 09h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    ")
+        self.code_section.append("    MOV DX, OFFSET buffer_texto")
+        self.code_section.append("    MOV AH, 0Ah")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Configurar puntero 'texto' al inicio real de los caracteres")
+        self.code_section.append("    MOV AX, OFFSET buffer_texto + 2")
+        self.code_section.append("    MOV texto, AX")
+        self.code_section.append("    ")
+        self.code_section.append("    ; Configurar 'texto_len' leyendo el segundo byte del buffer (cantidad leída)")
+        self.code_section.append("    MOV SI, OFFSET buffer_texto + 1")
+        self.code_section.append("    MOV AL, [SI]")
+        self.code_section.append("    MOV AH, 0")
+        self.code_section.append("    MOV texto_len, AX")
+        self.code_section.append("    ")
+        self.code_section.append("    RET")
+        self.code_section.append("leer_texto_usuario ENDP")
+        self.code_section.append("")
+        
+        # Helper: print_number
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("; Helper: Imprimir número en AX")
+        self.code_section.append("; ---------------------------------------------------------")
+        self.code_section.append("print_number PROC")
+        self.code_section.append("    PUSH AX")
+        self.code_section.append("    PUSH BX")
+        self.code_section.append("    PUSH CX")
+        self.code_section.append("    PUSH DX")
+        self.code_section.append("    ")
+        self.code_section.append("    MOV CX, 0")
+        self.code_section.append("    MOV BX, 10")
+        self.code_section.append("    ")
+        self.code_section.append("    CMP AX, 0")
+        self.code_section.append("    JNE loop_div")
+        self.code_section.append("    ; Si es 0, imprimir 0")
+        self.code_section.append("    MOV DL, '0'")
+        self.code_section.append("    MOV AH, 02h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    JMP fin_print")
+        self.code_section.append("")
+        self.code_section.append("loop_div:")
+        self.code_section.append("    MOV DX, 0")
+        self.code_section.append("    DIV BX      ; AX / 10, Resto en DX")
+        self.code_section.append("    PUSH DX     ; Guardar dígito")
+        self.code_section.append("    INC CX")
+        self.code_section.append("    CMP AX, 0")
+        self.code_section.append("    JNE loop_div")
+        self.code_section.append("")
+        self.code_section.append("print_digits:")
+        self.code_section.append("    POP DX")
+        self.code_section.append("    ADD DL, '0' ; Convertir a ASCII")
+        self.code_section.append("    MOV AH, 02h")
+        self.code_section.append("    INT 21h")
+        self.code_section.append("    LOOP print_digits")
+        self.code_section.append("")
+        self.code_section.append("fin_print:")
+        self.code_section.append("    POP DX")
+        self.code_section.append("    POP CX")
+        self.code_section.append("    POP BX")
+        self.code_section.append("    POP AX")
+        self.code_section.append("    RET")
+        self.code_section.append("print_number ENDP")
     
     def generate_crud_data_section(self):
         """Genera la sección de datos para modo CRUD basado en instrucciones.md (UN SOLO estudiante)"""

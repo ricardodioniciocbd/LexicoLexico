@@ -207,7 +207,8 @@ class PythonCompilerIDE:
         examples = [
             ("Factorial", "factorial"),
             ("Sistema Estudiantes", "estudiantes"),
-            ("Sistema Inventario", "inventario_struct")
+            ("Sistema Inventario", "inventario_struct"),
+            ("Procesamiento Cadenas", "procesamiento_cadenas")
         ]
         
         for label, value in examples:
@@ -992,106 +993,34 @@ class PythonCompilerIDE:
             self.load_estudiantes_example()
         elif example == "inventario_struct":
             self.load_inventory_struct_example()
-        elif example == "inventario_struct":
-            self.load_inventory_struct_example()
-    
-    def load_factorial_example(self):
-        """Carga el ejemplo de Factorial desde archivo"""
+        elif example == "procesamiento_cadenas":
+            self.load_procesamiento_cadenas_example()
+
+    def _load_example_from_file(self, filename, status_message):
+        """Carga un archivo de ejemplo en el editor."""
         try:
-            import os
-            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Factorial_con_recursion.py')
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', filename)
             with open(file_path, 'r', encoding='utf-8') as f:
                 code = f.read()
             self.code_editor.delete('1.0', 'end')
             self.code_editor.insert('1.0', code)
             self.update_line_numbers()
-            self.status_bar.config(text="Ejemplo de Factorial cargado", bg=COLORS['accent_green'], fg='#000000')
+            self.status_bar.config(text=status_message, bg=COLORS['accent_green'], fg='#000000')
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
             self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+
+    def load_factorial_example(self):
+        self._load_example_from_file('Factorial_con_recursion.py', "Ejemplo de Factorial cargado")
     
     def load_estudiantes_example(self):
-        """Carga el ejemplo de Sistema de Estudiantes desde archivo"""
-        try:
-            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_de_gestion_d_estudiantes.py')
-            with open(file_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-            self.code_editor.delete('1.0', 'end')
-            self.code_editor.insert('1.0', code)
-            self.update_line_numbers()
-            self.status_bar.config(text="Ejemplo de Sistema de Estudiantes cargado", bg=COLORS['accent_green'], fg='#000000')
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
-            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+        self._load_example_from_file('Sistema_de_gestion_d_estudiantes.py', "Ejemplo de Sistema de Estudiantes cargado")
     
     def load_inventory_struct_example(self):
-        """Carga el ejemplo del Sistema de Inventario con diccionarios"""
-        try:
-            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_inventario_DICCIONARIO.py')
-            with open(file_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-            self.code_editor.delete('1.0', 'end')
-            self.code_editor.insert('1.0', code)
-            self.update_line_numbers()
-            self.status_bar.config(text="Ejemplo de Sistema de Inventario con diccionarios cargado", bg=COLORS['accent_green'], fg='#000000')
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
-            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+        self._load_example_from_file('Sistema_inventario_DICCIONARIO.py', "Ejemplo de Sistema de Inventario con diccionarios cargado")
     
-    def load_search_example(self):
-        """Carga el ejemplo de búsqueda"""
-        code = '''# Búsqueda en Arreglo
-numeros = [10, 25, 30, 45, 50, 60, 75]
-buscando = 45
-encontrado = 0
-posicion = 0
-
-print("Buscando:")
-print(buscando)
-
-i = 0
-while i < len(numeros):
-    if numeros[i] == buscando:
-        encontrado = 1
-        posicion = i
-    i = i + 1
-
-if encontrado == 1:
-    print("Encontrado en posición:")
-    print(posicion)
-else:
-    print("No encontrado")
-'''
-        self.code_editor.delete('1.0', 'end')
-        self.code_editor.insert('1.0', code)
-        self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo de búsqueda cargado", bg=COLORS['accent_green'], fg='#000000')
-    
-    def load_list_processing_example(self):
-        """Carga el ejemplo de procesamiento de listas"""
-        code = '''# Procesamiento de Listas
-numeros = [10, 20, 30, 40, 50]
-suma = 0
-contador = 0
-
-print("Números:")
-for num in numeros:
-    print(num)
-    suma = suma + num
-    contador = contador + 1
-
-promedio = suma / contador
-
-print("Suma total:")
-print(suma)
-
-print("Promedio:")
-print(promedio)
-'''
-        self.code_editor.delete('1.0', 'end')
-        self.code_editor.insert('1.0', code)
-        self.update_line_numbers()
-        self.status_bar.config(text="Ejemplo de procesamiento cargado", bg=COLORS['accent_green'], fg='#000000')
+    def load_procesamiento_cadenas_example(self):
+        self._load_example_from_file('Sistema_de_procesamiento_d_cadenas.py', "Ejemplo de Procesamiento de Cadenas cargado")
     
     def load_error_example(self):
         """Carga el ejemplo con errores"""
@@ -1435,7 +1364,8 @@ class PythonCompilerIDE:
         examples = [
             ("Factorial", "factorial"),
             ("Sistema Estudiantes", "estudiantes"),
-            ("Sistema Inventario", "inventario_struct")
+            ("Sistema Inventario", "inventario_struct"),
+            ("Procesamiento Cadenas", "procesamiento_cadenas")
         ]
         
         for label, value in examples:
@@ -2005,6 +1935,10 @@ class PythonCompilerIDE:
             self.load_factorial_example()
         elif example == "estudiantes":
             self.load_estudiantes_example()
+        elif example == "inventario_struct":
+            self.load_inventory_struct_example()
+        elif example == "procesamiento_cadenas":
+            self.load_procesamiento_cadenas_example()
     
     def load_factorial_example(self):
         """Carga el ejemplo de Factorial desde archivo"""
@@ -2032,6 +1966,36 @@ class PythonCompilerIDE:
             self.code_editor.insert('1.0', code)
             self.update_line_numbers()
             self.status_bar.config(text="Ejemplo de Sistema de Estudiantes cargado", bg=COLORS['accent_green'], fg='#000000')
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
+            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+    
+    def load_inventory_struct_example(self):
+        """Carga el ejemplo del Sistema de Inventario con diccionarios"""
+        try:
+            import os
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_inventario_DICCIONARIO.py')
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            self.code_editor.delete('1.0', 'end')
+            self.code_editor.insert('1.0', code)
+            self.update_line_numbers()
+            self.status_bar.config(text="Ejemplo de Sistema de Inventario con diccionarios cargado", bg=COLORS['accent_green'], fg='#000000')
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
+            self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
+    
+    def load_procesamiento_cadenas_example(self):
+        """Carga el ejemplo de Procesamiento de Cadenas desde archivo"""
+        try:
+            import os
+            file_path = os.path.join(os.path.dirname(__file__), 'ejemplos', 'Sistema_de_procesamiento_d_cadenas.py')
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            self.code_editor.delete('1.0', 'end')
+            self.code_editor.insert('1.0', code)
+            self.update_line_numbers()
+            self.status_bar.config(text="Ejemplo de Procesamiento de Cadenas cargado", bg=COLORS['accent_green'], fg='#000000')
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar el archivo: {str(e)}")
             self.status_bar.config(text="Error al cargar ejemplo", bg=COLORS['accent_red'], fg='#ffffff')
@@ -2227,4 +2191,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -2,64 +2,52 @@
 .stack 100h
 
 .data
-    str_1  DB '', 0Dh, 0Ah, '$'
-    str_0  DB '===== EJEMPLO DE DICCIONARIOS =====', 0Dh, 0Ah, '$'
-    str_12 DB '===== FIN =====', 0Dh, 0Ah, '$'
-    str_9  DB 'Actualizando stock del producto 1...', 0Dh, 0Ah, '$'
-    str_5  DB 'Calculando valor del producto 1...', 0Dh, 0Ah, '$'
-    str_2  DB 'Creando producto con diccionario...', 0Dh, 0Ah, '$'
-    str_3  DB 'Producto creado:', 0Dh, 0Ah, '$'
-    str_4  DB 'Segundo producto:', 0Dh, 0Ah, '$'
-    str_10 DB 'Stock anterior:', 0Dh, 0Ah, '$'
-    str_11 DB 'Stock nuevo:', 0Dh, 0Ah, '$'
-    str_8  DB 'Valor total de inventario:', 0Dh, 0Ah, '$'
-    str_6  DB 'Valor total del Producto 1:', 0Dh, 0Ah, '$'
-    str_7  DB 'Valor total del Producto 2:', 0Dh, 0Ah, '$'
-
     newline DB 0Dh,0Ah,'$'
+    
+    ; --- Textos del Menú ---
+    str_0 DB 0Dh, 0Ah, '===== PROCESAMIENTO DE CADENAS =====', 0Dh, 0Ah, '$'
+    str_1 DB '1. Contar vocales', 0Dh, 0Ah, '$'
+    str_2 DB '2. Invertir cadena', 0Dh, 0Ah, '$'
+    str_3 DB '3. Verificar palindromo', 0Dh, 0Ah, '$'
+    str_4 DB '4. Contar un caracter especifico', 0Dh, 0Ah, '$'
+    str_5 DB '5. Convertir a mayusculas', 0Dh, 0Ah, '$'
+    str_6 DB '6. Salir', 0Dh, 0Ah, '$'
+    
+    str_7 DB 0Dh, 0Ah, 'Seleccione una opcion: $'
+    str_8 DB 0Dh, 0Ah, 'Ingrese texto: $'
+    str_13 DB 0Dh, 0Ah, 'Ingrese caracter a buscar: $'
+    
+    str_9 DB 0Dh, 0Ah, 'Cantidad de vocales: $'
+    str_10 DB 0Dh, 0Ah, 'Invertida: $'
+    str_11 DB ' Es palindromo.', 0Dh, 0Ah, '$'
+    str_12 DB ' No es palindromo.', 0Dh, 0Ah, '$'
+    str_14 DB 0Dh, 0Ah, 'El caracter aparece $'
+    str_15 DB ' veces.', 0Dh, 0Ah, '$'
+    str_16 DB 0Dh, 0Ah, 'En mayusculas: $'
+    str_17 DB 0Dh, 0Ah, 'Saliendo...', 0Dh, 0Ah, '$'
+    str_18 DB 0Dh, 0Ah, 'Opcion invalida.', 0Dh, 0Ah, '$'
 
-    input_buffer DB 6, ?, 6 DUP(?)
-
-    LaptopStr DB "Laptop",0
-    MouseStr  DB "Mouse",0
-
-    dict_open         DB "{'desc': '",0
-    dict_comma_precio DB "', 'precio': ",0
-    dict_comma_stock  DB ", 'stock': ",0
-    dict_close        DB "}",0
-
-    t0_desc   DW 0
-    t0_precio DW 0
-    t0_stock  DW 0
-
-    t1_desc   DW 0
-    t1_precio DW 0
-    t1_stock  DW 0
-
-    producto1        DW 0
-    producto1_precio DW 0
-    producto1_stock  DW 0
-
-    producto2        DW 0
-    producto2_precio DW 0
-    producto2_stock  DW 0
-
-    t0   DW 0
-    t1   DW 0
-    t2   DW 0
-    t3   DW 0
-    t4   DW 0
-    t5   DW 0
-    t6   DW 0
-    t7   DW 0
-    t8   DW 0
-    t9   DW 0
-    t10  DW 0
-    t11  DW 0
-    t12  DW 0
-    total  DW 0
-    valor1 DW 0
-    valor2 DW 0
+    ; --- Variables y Buffers ---
+    ; IMPORTANTE: Los buffers de entrada deben tener estructura: max_len, actual_len, bytes...
+    buffer_opcion DB 5, ?, 5 DUP(0)
+    buffer_texto  DB 50, ?, 50 DUP(0)
+    buffer_char   DB 5, ?, 5 DUP(0)
+    
+    ; Punteros y Variables
+    texto DW ?          ; Puntero al inicio del string actual
+    texto_len DW ?      ; Longitud del texto actual
+    
+    char_val DW 0       ; Renombrado de 'ch' a 'char_val'
+    caracter DW 0       ; Caracter a buscar (ASCII)
+    
+    contador DW 0
+    i DW 0
+    
+    invertida_buf DB 50 DUP(0), '$' ; Buffer para string invertido
+    
+    ; Variables temporales del compilador (reutilizadas)
+    t0 DW 0
+    t1 DW 0
 
 .code
 
@@ -67,6 +55,205 @@ main PROC
     MOV AX, @data
     MOV DS, AX
 
+    CALL user_main
+
+    MOV AH, 4Ch
+    INT 21h
+main ENDP
+
+; ---------------------------------------------------------
+; Función: contar_vocales
+; ---------------------------------------------------------
+contar_vocales PROC
+    MOV contador, 0
+    MOV i, 0
+
+L_cv_loop:
+    ; Condición bucle: i < len
+    MOV AX, i
+    CMP AX, texto_len
+    JGE L_cv_fin    ; Si i >= len, salir
+    
+    ; Leer caracter texto[i]
+    MOV BX, texto
+    ADD BX, i
+    MOV AL, [BX]    ; AL tiene el caracter
+    MOV AH, 0
+    MOV char_val, AX ; Guardar en variable temporal
+    
+    ; Comparaciones (A, E, I, O, U y minúsculas)
+    CMP AL, 'a'
+    JE es_vocal
+    CMP AL, 'e'
+    JE es_vocal
+    CMP AL, 'i'
+    JE es_vocal
+    CMP AL, 'o'
+    JE es_vocal
+    CMP AL, 'u'
+    JE es_vocal
+    CMP AL, 'A'
+    JE es_vocal
+    CMP AL, 'E'
+    JE es_vocal
+    CMP AL, 'I'
+    JE es_vocal
+    CMP AL, 'O'
+    JE es_vocal
+    CMP AL, 'U'
+    JE es_vocal
+    JMP sig_char
+
+es_vocal:
+    INC contador
+
+sig_char:
+    INC i
+    JMP L_cv_loop
+
+L_cv_fin:
+    MOV AX, contador
+    RET
+contar_vocales ENDP
+
+; ---------------------------------------------------------
+; Función: invertir
+; Imprime directamente la cadena invertida para simplificar
+; ---------------------------------------------------------
+invertir PROC
+    ; i = len - 1
+    MOV AX, texto_len
+    DEC AX
+    MOV i, AX
+
+L_inv_loop:
+    CMP i, 0
+    JL L_inv_fin    ; Si i < 0, terminar
+    
+    ; Imprimir caracter texto[i]
+    MOV BX, texto
+    ADD BX, i
+    MOV DL, [BX]
+    MOV AH, 02h
+    INT 21h
+    
+    DEC i
+    JMP L_inv_loop
+
+L_inv_fin:
+    RET
+invertir ENDP
+
+; ---------------------------------------------------------
+; Función: es_palindromo
+; Retorna 1 en AX si es palíndromo, 0 si no
+; ---------------------------------------------------------
+es_palindromo PROC
+    MOV SI, 0               ; Índice izquierdo
+    MOV DI, texto_len
+    DEC DI                  ; Índice derecho (len - 1)
+
+L_pal_loop:
+    CMP SI, DI
+    JGE es_pal_true         ; Si se cruzan, es palíndromo
+
+    ; Cargar char izquierdo
+    MOV BX, texto
+    ADD BX, SI
+    MOV AL, [BX]
+
+    ; Cargar char derecho
+    MOV BX, texto
+    ADD BX, DI
+    MOV AH, [BX]
+
+    CMP AL, AH
+    JNE es_pal_false        ; Si son diferentes, no es palíndromo
+
+    INC SI
+    DEC DI
+    JMP L_pal_loop
+
+es_pal_true:
+    MOV AX, 1
+    RET
+
+es_pal_false:
+    MOV AX, 0
+    RET
+es_palindromo ENDP
+
+; ---------------------------------------------------------
+; Función: contar_caracter
+; ---------------------------------------------------------
+contar_caracter PROC
+    MOV contador, 0
+    MOV i, 0
+
+L_cc_loop:
+    MOV AX, i
+    CMP AX, texto_len
+    JGE L_cc_fin
+
+    MOV BX, texto
+    ADD BX, i
+    MOV AL, [BX]    ; Caracter actual
+    MOV AH, 0
+    
+    MOV CX, caracter ; Caracter a buscar
+    CMP AX, CX
+    JNE L_cc_next
+    INC contador
+
+L_cc_next:
+    INC i
+    JMP L_cc_loop
+
+L_cc_fin:
+    MOV AX, contador
+    RET
+contar_caracter ENDP
+
+; ---------------------------------------------------------
+; Función: a_mayusculas
+; Imprime y convierte al vuelo
+; ---------------------------------------------------------
+a_mayusculas PROC
+    MOV i, 0
+L_may_loop:
+    MOV AX, i
+    CMP AX, texto_len
+    JGE L_may_fin
+
+    MOV BX, texto
+    ADD BX, i
+    MOV DL, [BX]    ; Cargar char
+    
+    ; Si es 'a'...'z', restar 32
+    CMP DL, 'a'
+    JB print_char
+    CMP DL, 'z'
+    JA print_char
+    SUB DL, 32      ; Convertir a mayúscula
+
+print_char:
+    MOV AH, 02h
+    INT 21h
+
+    INC i
+    JMP L_may_loop
+
+L_may_fin:
+    RET
+a_mayusculas ENDP
+
+
+; ---------------------------------------------------------
+; LOGICA DEL MENU
+; ---------------------------------------------------------
+user_main PROC
+menu_loop:
+    ; Mostrar opciones
     MOV DX, OFFSET str_0
     MOV AH, 09h
     INT 21h
@@ -76,350 +263,201 @@ main PROC
     MOV DX, OFFSET str_2
     MOV AH, 09h
     INT 21h
-
-    ; t0 = {}
-    MOV AX, OFFSET t0
-    MOV t0, AX
-
-    ; t0["desc"] = "Laptop"
-    MOV BX, OFFSET LaptopStr
-    MOV t0_desc, BX
-
-    ; t0["precio"] = 1200
-    MOV CX, 1200
-    MOV t0_precio, CX
-
-    ; t0["stock"] = 5
-    MOV DX, 5
-    MOV t0_stock, DX
-
-    ; producto1 = t0
-    MOV SI, t0
-    MOV producto1, SI
-
-    ; copiar a producto1_*
-    MOV AX, t0_precio
-    MOV producto1_precio, AX
-    MOV BX, t0_stock
-    MOV producto1_stock, BX
-
     MOV DX, OFFSET str_3
     MOV AH, 09h
     INT 21h
-
-    ; print(producto1)
-    MOV BX, t0_desc
-    MOV CX, producto1_precio
-    MOV DX, producto1_stock
-    CALL print_dict
-    MOV DX, OFFSET str_1
-    MOV AH, 09h
-    INT 21h
-
-    ; t1 = {}
-    MOV AX, OFFSET t1
-    MOV t1, AX
-
-    ; t1["desc"] = "Mouse"
-    MOV BX, OFFSET MouseStr
-    MOV t1_desc, BX
-
-    ; t1["precio"] = 25
-    MOV CX, 25
-    MOV t1_precio, CX
-
-    ; t1["stock"] = 20
-    MOV DX, 20
-    MOV t1_stock, DX
-
-    ; producto2 = t1
-    MOV SI, t1
-    MOV producto2, SI
-
-    ; copiar a producto2_*
-    MOV AX, t1_precio
-    MOV producto2_precio, AX
-    MOV BX, t1_stock
-    MOV producto2_stock, BX
-
     MOV DX, OFFSET str_4
     MOV AH, 09h
     INT 21h
-
-    ; print(producto2)
-    MOV BX, t1_desc
-    MOV CX, producto2_precio
-    MOV DX, producto2_stock
-    CALL print_dict
-    MOV DX, OFFSET str_1
-    MOV AH, 09h
-    INT 21h
-
     MOV DX, OFFSET str_5
     MOV AH, 09h
     INT 21h
-
-    ; t2 = producto1["precio"]
-    MOV AX, producto1_precio
-    MOV t2, AX
-
-    ; t3 = producto1["stock"]
-    MOV BX, producto1_stock
-    MOV t3, BX
-
-    ; t4 = t2 * t3
-    MOV CX, t2
-    MOV DX, t3
-    MOV AX, CX
-    MUL DX
-    MOV t4, AX
-
-    ; valor1 = t4
-    MOV AX, t4
-    MOV valor1, AX
-
     MOV DX, OFFSET str_6
     MOV AH, 09h
     INT 21h
-    MOV AX, valor1
-    CALL print_number_inline
-    MOV DX, OFFSET str_1
-    MOV AH, 09h
-    INT 21h
-
-    ; t5 = producto2["precio"]
-    MOV AX, producto2_precio
-    MOV t5, AX
-
-    ; t6 = producto2["stock"]
-    MOV AX, producto2_stock
-    MOV t6, AX
-
-    ; t7 = t5 * t6
-    MOV BX, t5
-    MOV CX, t6
-    MOV AX, BX
-    MUL CX
-    MOV t7, AX
-
-    ; valor2 = t7
-    MOV AX, t7
-    MOV valor2, AX
-
     MOV DX, OFFSET str_7
     MOV AH, 09h
     INT 21h
-    MOV AX, valor2
-    CALL print_number_inline
-    MOV DX, OFFSET str_1
-    MOV AH, 09h
+
+    ; Leer opción (buffer)
+    MOV DX, OFFSET buffer_opcion
+    MOV AH, 0Ah
     INT 21h
+    
+    ; Analizar opción (el char está en buffer+2)
+    MOV SI, OFFSET buffer_opcion + 2
+    MOV AL, [SI]
+    
+    CMP AL, '1'
+    JE op_1
+    CMP AL, '2'
+    JE op_2
+    CMP AL, '3'
+    JE op_3
+    CMP AL, '4'
+    JE op_4
+    CMP AL, '5'
+    JE op_5
+    CMP AL, '6'
+    JE op_6
+    
+    JMP op_invalida
 
-    ; t8 = valor1 + valor2
-    MOV AX, valor1
-    MOV BX, valor2
-    ADD AX, BX
-    MOV t8, AX
-
-    ; total = t8
-    MOV total, AX
-
-    MOV DX, OFFSET str_8
-    MOV AH, 09h
-    INT 21h
-    MOV AX, total
-    CALL print_number_inline
-    MOV DX, OFFSET str_1
-    MOV AH, 09h
-    INT 21h
-
+; --- OPCION 1: Contar Vocales ---
+op_1:
+    CALL leer_texto_usuario
     MOV DX, OFFSET str_9
     MOV AH, 09h
     INT 21h
+    CALL contar_vocales
+    CALL print_number
+    JMP menu_loop
+
+; --- OPCION 2: Invertir ---
+op_2:
+    CALL leer_texto_usuario
     MOV DX, OFFSET str_10
     MOV AH, 09h
     INT 21h
+    CALL invertir
+    JMP menu_loop
 
-    ; t9 = producto1["stock"]
-    MOV AX, producto1_stock
-    MOV t9, AX
-    MOV AX, t9
-    CALL print_number_inline
-
-    ; t10 = producto1["stock"]
-    MOV AX, producto1_stock
-    MOV t10, AX
-
-    ; t11 = t10 + 3
-    MOV AX, t10
-    ADD AX, 3
-    MOV t11, AX
-
-    ; producto1["stock"] = t11
-    MOV AX, t11
-    MOV producto1_stock, AX
-
-    MOV DX, OFFSET str_11
-    MOV AH, 09h
-    INT 21h
-
-    ; t12 = producto1["stock"]
-    MOV AX, producto1_stock
-    MOV t12, AX
-    MOV AX, t12
-    CALL print_number_inline
-
-    MOV DX, OFFSET str_1
-    MOV AH, 09h
-    INT 21h
+; --- OPCION 3: Palíndromo ---
+op_3:
+    CALL leer_texto_usuario
+    CALL es_palindromo
+    CMP AX, 1
+    JE es_pal
     MOV DX, OFFSET str_12
     MOV AH, 09h
     INT 21h
-
-    MOV AH, 4Ch
+    JMP menu_loop
+es_pal:
+    MOV DX, OFFSET str_11
+    MOV AH, 09h
     INT 21h
-main ENDP
+    JMP menu_loop
 
-;-------------------------------------------------------
-; Imprime cadena C-terminada (0)
-; Entrada: DS:SI -> cadena terminada en 0
-;   *Ahora preserva DX para no romper valores numéricos*
-;-------------------------------------------------------
-print_cstring PROC
-    PUSH AX
-    PUSH DX
-pc_loop:
+; --- OPCION 4: Contar Caracter ---
+op_4:
+    CALL leer_texto_usuario
+    
+    MOV DX, OFFSET str_13 ; Pedir char
+    MOV AH, 09h
+    INT 21h
+    
+    MOV DX, OFFSET buffer_char
+    MOV AH, 0Ah
+    INT 21h
+    
+    ; Obtener char ingresado
+    MOV SI, OFFSET buffer_char + 2
     MOV AL, [SI]
-    CMP AL, 0
-    JE pc_done
-    MOV DL, AL
-    MOV AH, 02h
+    MOV AH, 0
+    MOV caracter, AX
+    
+    MOV DX, OFFSET str_14
+    MOV AH, 09h
     INT 21h
-    INC SI
-    JMP pc_loop
-pc_done:
-    POP DX
-    POP AX
-    RET
-print_cstring ENDP
+    
+    CALL contar_caracter
+    CALL print_number
+    
+    MOV DX, OFFSET str_15
+    MOV AH, 09h
+    INT 21h
+    JMP menu_loop
 
-;-------------------------------------------------------
-; Imprime "diccionario" con formato:
-; {'desc': <BX-string>, 'precio': <CX>, 'stock': <DX>}
-;-------------------------------------------------------
-print_dict PROC
+; --- OPCION 5: Mayúsculas ---
+op_5:
+    CALL leer_texto_usuario
+    MOV DX, OFFSET str_16
+    MOV AH, 09h
+    INT 21h
+    CALL a_mayusculas
+    JMP menu_loop
+
+; --- OPCION 6: Salir ---
+op_6:
+    MOV DX, OFFSET str_17
+    MOV AH, 09h
+    INT 21h
+    RET
+
+op_invalida:
+    MOV DX, OFFSET str_18
+    MOV AH, 09h
+    INT 21h
+    JMP menu_loop
+
+user_main ENDP
+
+; ---------------------------------------------------------
+; Helper: Leer texto del usuario y configurar punteros
+; ---------------------------------------------------------
+leer_texto_usuario PROC
+    MOV DX, OFFSET str_8 ; "Ingrese texto"
+    MOV AH, 09h
+    INT 21h
+    
+    MOV DX, OFFSET buffer_texto
+    MOV AH, 0Ah
+    INT 21h
+    
+    ; Configurar puntero 'texto' al inicio real de los caracteres
+    MOV AX, OFFSET buffer_texto + 2
+    MOV texto, AX
+    
+    ; Configurar 'texto_len' leyendo el segundo byte del buffer (cantidad leída)
+    MOV SI, OFFSET buffer_texto + 1
+    MOV AL, [SI]
+    MOV AH, 0
+    MOV texto_len, AX
+    
+    RET
+leer_texto_usuario ENDP
+
+; ---------------------------------------------------------
+; Helper: Imprimir número en AX
+; ---------------------------------------------------------
+print_number PROC
     PUSH AX
     PUSH BX
     PUSH CX
     PUSH DX
-    PUSH SI
-
-    ; "{'desc': '"
-    MOV SI, OFFSET dict_open
-    CALL print_cstring
-
-    ; desc
-    MOV SI, BX
-    CALL print_cstring
-
-    ; "', 'precio': "
-    MOV SI, OFFSET dict_comma_precio
-    CALL print_cstring
-
-    ; precio (CX)
-    MOV AX, CX
-    CALL print_number_inline
-
-    ; ", 'stock': "
-    MOV SI, OFFSET dict_comma_stock
-    CALL print_cstring
-
-    ; stock (DX)  -> DX sigue intacto gracias a print_cstring
-    MOV AX, DX
-    CALL print_number_inline
-
-    ; "}"
-    MOV SI, OFFSET dict_close
-    CALL print_cstring
-
-    POP SI
-    POP DX
-    POP CX
-    POP BX
-    POP AX
-    RET
-print_dict ENDP
-
-;-------------------------------------------------------
-; Convierte cadena en SI -> AX (entero) [no usado aquí]
-;-------------------------------------------------------
-string_to_int PROC
-    PUSH BX
-    PUSH CX
-    PUSH DX
-    XOR AX, AX
-    MOV CX, 10
-s2i_loop:
-    MOV BL, [SI]
-    CMP BL, 0
-    JE s2i_done
-    CMP BL, '0'
-    JL s2i_done
-    CMP BL, '9'
-    JG s2i_done
-    SUB BL, '0'
-    MOV BH, 0
-    MUL CX
-    ADD AX, BX
-    INC SI
-    JMP s2i_loop
-s2i_done:
-    POP DX
-    POP CX
-    POP BX
-    RET
-string_to_int ENDP
-
-;-------------------------------------------------------
-; Imprime número en AX (base 10)
-;-------------------------------------------------------
-print_number_inline PROC
-    PUSH AX
-    PUSH BX
-    PUSH CX
-    PUSH DX
-    PUSH SI
-
+    
     MOV CX, 0
     MOV BX, 10
+    
     CMP AX, 0
-    JGE pn_loop
-    NEG AX
-    PUSH AX
-    MOV DL, '-'
+    JNE loop_div
+    ; Si es 0, imprimir 0
+    MOV DL, '0'
     MOV AH, 02h
     INT 21h
-    POP AX
-pn_loop:
-    XOR DX, DX
-    DIV BX
-    PUSH DX
+    JMP fin_print
+
+loop_div:
+    MOV DX, 0
+    DIV BX      ; AX / 10, Resto en DX
+    PUSH DX     ; Guardar dígito
     INC CX
     CMP AX, 0
-    JNE pn_loop
-pn_digits:
+    JNE loop_div
+
+print_digits:
     POP DX
-    ADD DL, '0'
+    ADD DL, '0' ; Convertir a ASCII
     MOV AH, 02h
     INT 21h
-    LOOP pn_digits
+    LOOP print_digits
 
-    POP SI
+fin_print:
     POP DX
     POP CX
     POP BX
     POP AX
     RET
-print_number_inline ENDP
+print_number ENDP
 
 END main

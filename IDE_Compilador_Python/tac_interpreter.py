@@ -256,7 +256,17 @@ class TACInterpreter:
         elif instr.op == 'LIST_GET':
             list_var = self.get_value(instr.arg1)
             index = self.get_value(instr.arg2)
-            if isinstance(list_var, list):
+            if isinstance(list_var, str):
+                # Si es una cadena, permitir acceso por índice
+                if isinstance(index, (int, float)):
+                    index = int(index)
+                    if 0 <= index < len(list_var):
+                        self.variables[instr.result] = list_var[index]
+                    else:
+                        raise Exception(f"Error de ejecución: Índice fuera de rango: {index}")
+                else:
+                    raise Exception(f"Error de ejecución: Índice debe ser número: {index}")
+            elif isinstance(list_var, list):
                 if isinstance(index, (int, float)):
                     index = int(index)
                     if 0 <= index < len(list_var):
@@ -272,7 +282,7 @@ class TACInterpreter:
                 else:
                     raise Exception(f"Error de ejecución: Clave no encontrada: {index}")
             else:
-                raise Exception(f"Error de ejecución: {instr.arg1} no es una lista ni diccionario")
+                raise Exception(f"Error de ejecución: {instr.arg1} no es una lista, diccionario ni string")
         
         elif instr.op == 'LIST_SET':
             list_var = self.variables.get(instr.arg1, None)
@@ -293,10 +303,10 @@ class TACInterpreter:
         elif instr.op == 'CALL':
             if instr.arg1 == 'len':
                 list_var = self.get_value(instr.arg2)
-                if isinstance(list_var, list):
+                if isinstance(list_var, (list, str)):
                     self.variables[instr.result] = len(list_var)
                 else:
-                    raise Exception(f"Error de ejecución: len() requiere una lista")
+                    raise Exception(f"Error de ejecución: len() requiere una lista o string")
             elif instr.arg1 == 'int':
                 # Conversión de string a entero
                 arg_value = self.get_value(instr.arg2)
